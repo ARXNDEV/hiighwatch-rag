@@ -2,7 +2,7 @@
 
 A premium, production-ready AI SaaS application that connects directly to your Google Drive. It extracts text from your personal PDFs, Docs, and TXT files, embeds them into a FAISS vector database, and lets you chat with your documents using Groq's blazing-fast **LLaMA 3.3 (70B)** model.
 
-Featuring a stunning, Apple-quality glassmorphic Next.js UI, fully conversational AI memory, and MongoDB-backed synchronization.
+
 
 ---
 

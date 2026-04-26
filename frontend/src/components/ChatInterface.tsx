@@ -40,11 +40,25 @@ export function ChatInterface() {
     }
   }, [messages, loading]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+  useEffect(() => {
+    const handleDocumentSummaryRequest = (e: Event) => {
+      const customEvent = e as CustomEvent<{ docName: string }>;
+      if (customEvent.detail && customEvent.detail.docName) {
+        handleSourceClick(customEvent.detail.docName);
+      }
+    };
 
-    const userQuery = query.trim();
+    window.addEventListener('requestDocumentSummary', handleDocumentSummaryRequest);
+    return () => {
+      window.removeEventListener('requestDocumentSummary', handleDocumentSummaryRequest);
+    };
+  }, [loading]);
+
+  const handleSubmit = async (e?: React.FormEvent, overrideQuery?: string) => {
+    if (e) e.preventDefault();
+    const userQuery = (overrideQuery || query).trim();
+    if (!userQuery) return;
+
     setQuery("");
     setMessages((prev) => [...prev, { role: "user", content: userQuery }]);
     setLoading(true);
@@ -67,6 +81,12 @@ export function ChatInterface() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSourceClick = (docName: string) => {
+    if (loading) return;
+    const summaryQuery = `Please provide a comprehensive summary of the document: ${docName}`;
+    handleSubmit(undefined, summaryQuery);
   };
 
   return (
@@ -115,8 +135,13 @@ export function ChatInterface() {
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3">
                     {msg.sources.map((src, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] text-white/50 hover:text-white/90 hover:bg-white/[0.08] transition-colors cursor-pointer group/src backdrop-blur-sm">
-                        <FileText className="w-3 h-3" />
+                      <div 
+                        key={i} 
+                        onClick={() => handleSourceClick(src.name)}
+                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] text-white/50 hover:text-white/90 hover:bg-white/[0.08] hover:border-white/20 transition-all cursor-pointer group/src backdrop-blur-sm active:scale-95"
+                        title="Click to summarize this document"
+                      >
+                        <FileText className="w-3 h-3 group-hover/src:text-white" />
                         <span className="truncate max-w-[200px] font-medium">{src.name}</span>
                       </div>
                     ))}

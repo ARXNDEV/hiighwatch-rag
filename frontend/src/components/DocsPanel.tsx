@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { FileText, CheckCircle, Database } from "lucide-react";
 
-export function DocsPanel({ docs }: { docs: { id: string, name: string, status: string }[] }) {
+export function DocsPanel({ docs, onDocumentClick }: { docs: { id: string, name: string, status: string }[], onDocumentClick?: (name: string) => void }) {
   return (
     <div className="flex-1 overflow-y-auto pr-1 -mr-1 space-y-1.5 custom-scrollbar">
       {docs.length === 0 ? (
@@ -18,13 +18,15 @@ export function DocsPanel({ docs }: { docs: { id: string, name: string, status: 
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.03 }}
-            className="p-2.5 rounded-lg flex items-center gap-3 group/item hover:bg-white/[0.04] transition-colors cursor-default"
+            onClick={() => onDocumentClick && onDocumentClick(doc.name)}
+            className="p-2.5 rounded-lg flex items-center gap-3 group/item hover:bg-white/[0.08] transition-colors cursor-pointer active:scale-[0.98]"
+            title="Click to ask AI to summarize this document"
           >
-            <div className="w-7 h-7 rounded-md bg-white/[0.05] flex items-center justify-center text-white/50 group-hover/item:text-white transition-colors border border-white/[0.05]">
+            <div className="w-7 h-7 rounded-md bg-white/[0.05] flex items-center justify-center text-white/50 group-hover/item:text-white group-hover/item:bg-white/[0.1] transition-colors border border-white/[0.05]">
               <FileText className="w-3.5 h-3.5" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-white/70 group-hover/item:text-white/90 transition-colors">{doc.name}</p>
+              <p className="text-sm font-medium truncate text-white/70 group-hover/item:text-white transition-colors">{doc.name}</p>
             </div>
           </motion.div>
         ))

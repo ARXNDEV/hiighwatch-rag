@@ -43,6 +43,11 @@ function DashboardContent() {
     });
   };
 
+  const handleDocumentClick = (docName: string) => {
+    // We can dispatch a custom event that ChatInterface will listen to
+    window.dispatchEvent(new CustomEvent('requestDocumentSummary', { detail: { docName } }));
+  };
+
   if (isAuthenticated === null) {
     return <div className="flex items-center justify-center min-h-screen text-white bg-[#030303]">Verifying access...</div>;
   }
@@ -74,7 +79,7 @@ function DashboardContent() {
         {/* Docs Section */}
         <div className="flex-1 flex flex-col min-h-0 p-5 pt-5">
           <h3 className="text-[0.7rem] font-semibold text-white/40 uppercase tracking-[0.15em] mb-4 pl-1">Knowledge Base</h3>
-          <DocsPanel docs={docs} />
+          <DocsPanel docs={docs} onDocumentClick={handleDocumentClick} />
         </div>
       </div>
 

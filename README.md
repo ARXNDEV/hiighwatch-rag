@@ -13,7 +13,7 @@ A premium, production-ready AI SaaS application that connects directly to your G
 - **LLaMA 3.3 (70B) Intelligence**: Powered by Groq's LPU inference engine for lightning-fast, GPT-4 class reasoning.
 - **Conversational Memory**: The AI remembers your previous questions and understands context (pronouns, follow-ups) flawlessly.
 - **Smart Sync**: Uses MongoDB to track file metadata, ensuring it only downloads *new* or *modified* files, saving massive bandwidth.
-- **Premium UI/UX**: Built with Next.js, Tailwind CSS, and Framer Motion. Features a dark-mode "App Shell" architecture, beautiful markdown rendering, and hardware-accelerated background animations.
+
 
 ---
 

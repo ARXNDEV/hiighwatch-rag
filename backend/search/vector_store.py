@@ -2,10 +2,10 @@ import faiss
 import numpy as np
 import json
 import os
+from db import files_collection
 
 INDEX_FILE = "synced_docs/faiss.index"
 CHUNKS_FILE = "synced_docs/chunks.json"
-METADATA_FILE = "synced_docs/metadata.json"
 DIMENSION = 384 # Dimension for 'all-MiniLM-L6-v2'
 
 def load_faiss_index():
@@ -85,8 +85,12 @@ def search_faiss(query, k=5, filters=None):
     return results
 
 def get_document_metadata(doc_id):
-    if os.path.exists(METADATA_FILE):
-        with open(METADATA_FILE, "r") as f:
-            metadata = json.load(f)
-            return metadata.get(doc_id)
+    # Instead of looking for a local metadata.json, we fetch from MongoDB
+    doc = files_collection.find_one({"file_id": doc_id})
+    if doc:
+        return {
+            "name": doc.get("name"),
+            "mimeType": doc.get("mimeType"),
+            "modifiedTime": doc.get("modifiedTime")
+        }
     return None

@@ -2,6 +2,7 @@ import fitz # PyMuPDF
 import docx
 import os
 import re
+import concurrent.futures
 
 def clean_text(text: str) -> str:
     text = re.sub(r'\s+', ' ', text)
@@ -33,37 +34,46 @@ def extract_text_from_txt(filepath: str) -> str:
     with open(filepath, 'r', encoding='utf-8') as f:
         return f.read()
 
+def _process_single_file(file):
+    filepath = file['path']
+    ext = os.path.splitext(filepath)[1].lower()
+    local_chunks = []
+
+    try:
+        text = ""
+        if ext == '.pdf':
+            text = extract_text_from_pdf(filepath)
+        elif ext == '.docx':
+            text = extract_text_from_docx(filepath)
+        elif ext == '.txt':
+            text = extract_text_from_txt(filepath)
+        else:
+            print(f"Unsupported file extension: {ext}")
+            return []
+
+        cleaned_text = clean_text(text)
+        if not cleaned_text:
+            return []
+
+        file_chunks = chunk_text(cleaned_text, chunk_size=500, overlap=50)
+        for i, c in enumerate(file_chunks):
+            local_chunks.append({
+                "id": f"{file['id']}_chunk_{i}",
+                "doc_id": file['id'],
+                "text": c
+            })
+    except Exception as e:
+        print(f"Error processing file {filepath}: {e}")
+        
+    return local_chunks
+
 def process_files(files):
-    chunks = []
-    for file in files:
-        filepath = file['path']
-        mime_type = file['mimeType']
-        ext = os.path.splitext(filepath)[1].lower()
-
-        try:
-            text = ""
-            if ext == '.pdf':
-                text = extract_text_from_pdf(filepath)
-            elif ext == '.docx':
-                text = extract_text_from_docx(filepath)
-            elif ext == '.txt':
-                text = extract_text_from_txt(filepath)
-            else:
-                print(f"Unsupported file extension: {ext}")
-                continue
-
-            cleaned_text = clean_text(text)
-            if not cleaned_text:
-                continue
-
-            file_chunks = chunk_text(cleaned_text, chunk_size=500, overlap=50)
-            for i, c in enumerate(file_chunks):
-                chunks.append({
-                    "id": f"{file['id']}_chunk_{i}",
-                    "doc_id": file['id'],
-                    "text": c
-                })
-        except Exception as e:
-            print(f"Error processing file {filepath}: {e}")
-
-    return chunks
+    all_chunks = []
+    
+    # Process files in parallel to speed up extraction
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        results = executor.map(_process_single_file, files)
+        for chunk_list in results:
+            all_chunks.extend(chunk_list)
+            
+    return all_chunks

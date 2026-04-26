@@ -260,6 +260,9 @@ def disconnect_drive_endpoint():
 @router.post("/sync-drive")
 def sync_drive_endpoint(force: bool = False):
     try:
+        import time
+        start_time = time.time()
+        
         if force:
             from connectors.gdrive import get_drive_service
             service = get_drive_service()
@@ -292,16 +295,19 @@ def sync_drive_endpoint(force: bool = False):
         if not chunks:
             return {"status": "success", "files_processed": len(downloaded_files), "message": "Files downloaded but no text extracted.", "files": [{"id": f["id"], "name": f["name"]} for f in downloaded_files]}
 
-        # 3. Embed chunks
+        # 3. Embed chunks (Parallelized)
         embedded_chunks = embed_chunks(chunks)
 
         # 4. Add to FAISS vector store
         add_to_faiss(embedded_chunks)
 
+        end_time = time.time()
+        print(f"Sync completed in {round(end_time - start_time, 2)} seconds")
+
         return {
             "status": "success",
             "files_processed": len(downloaded_files),
-            "message": f"Successfully synced and embedded {len(downloaded_files)} files.",
+            "message": f"Successfully synced and embedded {len(downloaded_files)} files in {round(end_time - start_time, 1)}s.",
             "files": [{"id": f["id"], "name": f["name"]} for f in downloaded_files]
         }
     except Exception as e:

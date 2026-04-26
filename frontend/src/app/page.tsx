@@ -469,6 +469,16 @@ function HomeContent() {
           </motion.div>
         ))}
       </motion.div>
+      
+      {/* Footer with Privacy & Terms */}
+      <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-6 text-xs text-white/30 z-20">
+        <Link href="/privacy" className="hover:text-white/70 transition-colors">
+          Privacy Policy
+        </Link>
+        <Link href="/terms" className="hover:text-white/70 transition-colors">
+          Terms of Service
+        </Link>
+      </div>
     </main>
   );
 }

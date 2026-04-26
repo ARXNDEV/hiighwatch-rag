@@ -58,8 +58,14 @@ def auth_login():
         if os.path.exists(states_file):
             with open(states_file, "r") as f:
                 try:
-                    states = json.load(f)
-                except:
+                    content = f.read().strip()
+                    if content:
+                        states = json.loads(content)
+                except json.JSONDecodeError as e:
+                    print(f"Warning: Failed to parse oauth_states.json: {e}. Starting fresh.")
+                    states = {}
+                except Exception as e:
+                    print(f"Warning: Error reading oauth_states.json: {e}")
                     pass
                     
         # Save new state
@@ -93,8 +99,7 @@ def get_storage_stats():
                 fp = os.path.join("synced_docs", f)
                 if os.path.isfile(fp):
                     docs_size_bytes += os.path.getsize(fp)
-                    if f != "metadata.json":
-                        docs_count += 1
+                    docs_count += 1
                         
         return {
             "vectors": vector_count,
@@ -158,8 +163,14 @@ def auth_callback(state: str, code: str):
         if os.path.exists(states_file):
             with open(states_file, "r") as f:
                 try:
-                    states = json.load(f)
-                except:
+                    content = f.read().strip()
+                    if content:
+                        states = json.loads(content)
+                except json.JSONDecodeError as e:
+                    print(f"Warning: Failed to parse oauth_states.json in callback: {e}")
+                    states = {}
+                except Exception as e:
+                    print(f"Warning: Error reading oauth_states.json in callback: {e}")
                     pass
 
         if state not in states:
@@ -222,16 +233,19 @@ from datetime import datetime
 def disconnect_drive_endpoint():
     try:
         token_file = "token.json"
-        metadata_file = os.path.join("synced_docs", "metadata.json")
         states_file = "oauth_states.json"
         
         # Remove token.json to force re-authentication
         if os.path.exists(token_file):
             os.remove(token_file)
             
-        # Remove metadata to clear the sync cache
-        if os.path.exists(metadata_file):
-            os.remove(metadata_file)
+        # Clean up local files
+        sync_dir = "synced_docs"
+        if os.path.exists(sync_dir):
+            for f in os.listdir(sync_dir):
+                fp = os.path.join(sync_dir, f)
+                if os.path.isfile(fp):
+                    os.remove(fp)
             
         # Remove old states
         if os.path.exists(states_file):
@@ -254,11 +268,17 @@ def sync_drive_endpoint(force: bool = False):
                 user_email = about['user']['emailAddress']
                 files_collection.delete_many({"user_email": user_email})
             except Exception as e:
-                print("Failed to get user email for force sync", e)
+                print(f"Failed to get user email for force sync: {e}")
                 
-            metadata_file = os.path.join("synced_docs", "metadata.json")
-            if os.path.exists(metadata_file):
-                os.remove(metadata_file)
+            # DO NOT try to delete metadata.json since we use MongoDB now
+            # Just clear the local folder if we are forcing
+            import shutil
+            sync_dir = "synced_docs"
+            if os.path.exists(sync_dir):
+                for f in os.listdir(sync_dir):
+                    fp = os.path.join(sync_dir, f)
+                    if os.path.isfile(fp):
+                        os.remove(fp)
                 
         # 1. Fetch files from Google Drive
         downloaded_files = sync_google_drive()

@@ -70,8 +70,8 @@ def _process_single_file(file):
 def process_files(files):
     all_chunks = []
     
-    # Process files in parallel to speed up extraction
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    # Process files in parallel, but limit to 2 workers to prevent Render OOM (512MB RAM Limit)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         results = executor.map(_process_single_file, files)
         for chunk_list in results:
             all_chunks.extend(chunk_list)

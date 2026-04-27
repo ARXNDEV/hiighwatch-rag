@@ -54,11 +54,12 @@ def search_faiss(query, k=5, filters=None):
     index = load_faiss_index()
     chunks = load_chunks()
 
-    if index.ntotal == 0:
+    if index.ntotal == 0 or len(chunks) == 0:
         return []
 
-    # If filters are applied, we might need to search for more chunks to find enough matches
-    search_k = k * 10 if filters else k
+    # Ensure search_k doesn't exceed the total number of vectors in FAISS
+    # If filtering, search the ENTIRE database to guarantee we find the matching document's chunks
+    search_k = index.ntotal if filters else min(k, index.ntotal)
 
     query_embedding = model.encode([query], normalize_embeddings=True).astype('float32')
     distances, indices = index.search(query_embedding, search_k)

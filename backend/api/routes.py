@@ -406,8 +406,18 @@ def ask_endpoint(req: AskRequest):
         # Cache key based on query and filters
         cache_key = hashlib.md5(f"{req.query}_{req.filter_metadata}".encode()).hexdigest()
         
+        # Auto-detect summary requests to apply metadata filtering
+        filter_metadata = req.filter_metadata
+        faiss_query = req.query
+        if req.query.startswith("Please provide a comprehensive summary of the document: "):
+            doc_name = req.query.replace("Please provide a comprehensive summary of the document: ", "").strip()
+            if not filter_metadata:
+                filter_metadata = {"name": doc_name}
+            # Change the semantic search query so it doesn't get confused by the word "Please provide"
+            faiss_query = f"Overview and summary of {doc_name}"
+                
         # 1. Search FAISS for top chunks, increasing K significantly because we have smaller 250-word chunks now
-        top_chunks = search_faiss(req.query, k=15, filters=req.filter_metadata)
+        top_chunks = search_faiss(faiss_query, k=15, filters=filter_metadata)
         
         if not top_chunks:
             return AskResponse(

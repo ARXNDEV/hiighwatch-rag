@@ -317,7 +317,7 @@ def background_sync_process(items, user_email):
         active_syncs.discard(user_email)
 
 @router.post("/sync-drive")
-def sync_drive_endpoint(background_tasks: BackgroundTasks, force: Optional[bool] = False):
+def sync_drive_endpoint(force: Optional[bool] = False):
     try:
         import time
         start_time = time.time()
@@ -349,15 +349,24 @@ def sync_drive_endpoint(background_tasks: BackgroundTasks, force: Optional[bool]
         if not items:
             return {"status": "success", "files_processed": 0, "message": "No new files to sync.", "files": []}
 
-        background_tasks.add_task(background_sync_process, items, user_email)
+        # Process files synchronously instead of in the background
+        downloaded_files = download_items(items, user_email)
+        if downloaded_files:
+            print(f"Extracting text from {len(downloaded_files)} files...")
+            chunks = process_files(downloaded_files)
+            if chunks:
+                print(f"Embedding {len(chunks)} chunks...")
+                embedded_chunks = embed_chunks(chunks)
+                print("Adding chunks to FAISS...")
+                add_to_faiss(embedded_chunks)
 
         end_time = time.time()
-        print(f"Sync queued in {round(end_time - start_time, 2)} seconds. Background indexing started.")
+        print(f"Sync and indexing completed in {round(end_time - start_time, 2)} seconds.")
 
         return {
             "status": "success",
             "files_processed": len(items),
-            "message": f"Successfully queued {len(items)} files. AI is indexing them in the background.",
+            "message": f"Successfully synced and indexed {len(items)} files.",
             "files": [{"id": f["id"], "name": f["name"]} for f in items]
         }
     except Exception as e:

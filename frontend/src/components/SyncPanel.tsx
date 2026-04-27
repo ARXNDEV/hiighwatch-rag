@@ -26,7 +26,6 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
         } else if (status === "processing" && res.data.status === "Ready") {
           setStatus("success");
           setMessage("Indexing complete! Documents are ready to be queried.");
-          setSyncing(false);
         }
       } catch (err) {
         // ignore polling errors
@@ -55,8 +54,8 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
     setMessage(force ? "Force syncing from Google Drive..." : "Syncing from Google Drive...");
     try {
       const res = await axios.post(`${getApiBaseUrl()}/sync-drive${force ? "?force=true" : ""}`);
-      setStatus("processing");
-      setMessage("AI is extracting text and indexing documents...");
+      setStatus("success");
+      setMessage(res.data.message || `Successfully synced ${res.data.files_processed} files.`);
       
       if (res.data.files && res.data.files.length > 0) {
         onSyncSuccess(res.data.files.map((f: any) => ({
@@ -68,11 +67,10 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
       
       // Clean up URL to remove ?sync=true
       router.replace("/dashboard");
-      // Intentionally NOT setting syncing to false here. 
-      // The polling interval will set it to false when the background task finishes.
     } catch (err: any) {
       setStatus("error");
       setMessage(err.response?.data?.detail || "An error occurred during sync.");
+    } finally {
       setSyncing(false);
     }
   };
@@ -85,16 +83,16 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
 
       <button
         onClick={() => handleSync(false)}
-        disabled={syncing || status === "processing"}
+        disabled={syncing}
         className="w-full py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2.5 transition-all relative overflow-hidden disabled:opacity-70 disabled:cursor-not-allowed bg-white text-black hover:shadow-[0_0_20px_rgba(255,255,255,0.15)] group"
       >
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/[0.05] to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out" />
-        {(syncing || status === "processing") ? (
+        {syncing ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />
         ) : (
           <Cloud className="w-3.5 h-3.5 text-black" />
         )}
-        {(syncing || status === "processing") ? "Syncing..." : "Sync Drive"}
+        {syncing ? "Syncing..." : "Sync Drive"}
       </button>
       
       <button

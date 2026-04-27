@@ -257,8 +257,32 @@ def disconnect_drive_endpoint():
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+def background_sync_process(downloaded_files):
+    try:
+        import time
+        start_time = time.time()
+        print(f"Background: Extracting text from {len(downloaded_files)} files...")
+        chunks = process_files(downloaded_files)
+        
+        if not chunks:
+            print("Background: Files downloaded but no text extracted.")
+            return
+
+        print(f"Background: Embedding {len(chunks)} chunks...")
+        embedded_chunks = embed_chunks(chunks)
+
+        print("Background: Adding chunks to FAISS...")
+        add_to_faiss(embedded_chunks)
+
+        end_time = time.time()
+        print(f"Background: Sync completed in {round(end_time - start_time, 2)} seconds")
+    except Exception as e:
+        import traceback
+        print("Background Sync Error:")
+        traceback.print_exc()
+
 @router.post("/sync-drive")
-def sync_drive_endpoint(force: bool = False):
+def sync_drive_endpoint(background_tasks: BackgroundTasks, force: bool = False):
     try:
         import time
         start_time = time.time()
@@ -290,28 +314,16 @@ def sync_drive_endpoint(force: bool = False):
         if not downloaded_files:
             return {"status": "success", "files_processed": 0, "message": "No new files to sync.", "files": []}
 
-        # 2. Extract and chunk text
-        print(f"Extracting text from {len(downloaded_files)} files...")
-        chunks = process_files(downloaded_files)
-        
-        if not chunks:
-            return {"status": "success", "files_processed": len(downloaded_files), "message": "Files downloaded but no text extracted.", "files": [{"id": f["id"], "name": f["name"]} for f in downloaded_files]}
-
-        # 3. Embed chunks (Parallelized)
-        print(f"Embedding {len(chunks)} chunks...")
-        embedded_chunks = embed_chunks(chunks)
-
-        # 4. Add to FAISS vector store
-        print("Adding chunks to FAISS...")
-        add_to_faiss(embedded_chunks)
+        # 2. Queue for background processing
+        background_tasks.add_task(background_sync_process, downloaded_files)
 
         end_time = time.time()
-        print(f"Sync completed in {round(end_time - start_time, 2)} seconds")
+        print(f"Drive API completed in {round(end_time - start_time, 2)} seconds. Background indexing started.")
 
         return {
             "status": "success",
             "files_processed": len(downloaded_files),
-            "message": f"Successfully synced and embedded {len(downloaded_files)} files in {round(end_time - start_time, 1)}s.",
+            "message": f"Successfully queued {len(downloaded_files)} files. AI is indexing them in the background.",
             "files": [{"id": f["id"], "name": f["name"]} for f in downloaded_files]
         }
     except Exception as e:

@@ -113,7 +113,7 @@ def sync_google_drive():
     query = "mimeType='application/pdf' or mimeType='application/vnd.google-apps.document' or mimeType='text/plain'"
     results = service.files().list(
         q=query,
-        pageSize=3, # Reduced from 15 to 3 to prevent 100-second timeouts on Render
+        pageSize=10, # Increased back to 10 since processing is now in the background
         fields="nextPageToken, files(id, name, mimeType, modifiedTime)",
         orderBy="modifiedTime desc"
     ).execute()

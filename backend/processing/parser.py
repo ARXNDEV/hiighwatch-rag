@@ -8,7 +8,7 @@ def clean_text(text: str) -> str:
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
-def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50):
+def chunk_text(text: str, chunk_size: int = 200, overlap: int = 30):
     words = text.split()
     chunks = []
     for i in range(0, len(words), max(1, chunk_size - overlap)):
@@ -56,7 +56,7 @@ def _process_single_file(file):
         if not cleaned_text:
             return []
 
-        file_chunks = chunk_text(cleaned_text, chunk_size=500, overlap=50)
+        file_chunks = chunk_text(cleaned_text, chunk_size=200, overlap=30)
         for i, c in enumerate(file_chunks):
             local_chunks.append({
                 "id": f"{file['id']}_chunk_{i}",

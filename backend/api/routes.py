@@ -335,9 +335,13 @@ def sync_drive_endpoint(force: Optional[bool] = False):
             except Exception as e:
                 print(f"Failed to get user email for force sync: {e}")
                 
-            # DO NOT try to delete metadata.json since we use MongoDB now
-            # Just clear the local folder if we are forcing
-            import shutil
+            # Clear FAISS index as well
+            if os.path.exists("synced_docs/faiss.index"):
+                os.remove("synced_docs/faiss.index")
+            if os.path.exists("synced_docs/chunks.json"):
+                os.remove("synced_docs/chunks.json")
+                
+            # Clear local files
             sync_dir = "synced_docs"
             if os.path.exists(sync_dir):
                 for f in os.listdir(sync_dir):

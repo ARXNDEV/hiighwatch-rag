@@ -86,8 +86,14 @@ def search_faiss(query, k=5, filters=None):
     return results
 
 def get_document_metadata(doc_id):
+    # Strip the _chunk_X suffix to get the real doc_id
+    base_doc_id = doc_id.split('_chunk_')[0] if '_chunk_' in doc_id else doc_id
+    
     # Instead of looking for a local metadata.json, we fetch from MongoDB
-    doc = files_collection.find_one({"file_id": doc_id})
+    # Try both 'file_id' and 'id' depending on how it was saved
+    doc = files_collection.find_one({"file_id": base_doc_id})
+    if not doc:
+        doc = files_collection.find_one({"id": base_doc_id})
     if doc:
         return {
             "name": doc.get("name"),

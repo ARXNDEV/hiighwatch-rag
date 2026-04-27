@@ -499,7 +499,7 @@ Question:
 
         try:
             completion = client.chat.completions.create(
-                model="llama3-8b-8192", # Switched to smaller, faster, higher-limit model
+                model="llama-3.1-8b-instant", # Switched to the currently supported 8B model on Groq
                 messages=messages,
                 temperature=0.4,
                 max_tokens=2048,

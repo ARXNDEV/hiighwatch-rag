@@ -202,7 +202,7 @@ export function ChatInterface() {
             </button>
           </form>
           <p className="text-center text-[10px] text-white/30 mt-3 font-medium">
-            LLaMA 3 (8B) can make mistakes. Always verify important information.
+            LLaMA 3.1 (8B) can make mistakes. Always verify important information.
           </p>
         </div>
       </div>

@@ -499,7 +499,7 @@ Question:
 
         try:
             completion = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="llama3-8b-8192", # Switched to smaller, faster, higher-limit model
                 messages=messages,
                 temperature=0.4,
                 max_tokens=2048,

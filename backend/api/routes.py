@@ -282,11 +282,15 @@ def background_sync_process(downloaded_files):
         traceback.print_exc()
 
 @router.post("/sync-drive")
-def sync_drive_endpoint(background_tasks: BackgroundTasks, force: bool = False):
+def sync_drive_endpoint(background_tasks: BackgroundTasks, force: Optional[bool] = False):
     try:
         import time
         start_time = time.time()
         
+        # --- Handle CORS Preflight / Basic Error Catching ---
+        if not os.path.exists("token.json"):
+            raise Exception("No token.json found. Please login to Google Drive first.")
+            
         if force:
             from connectors.gdrive import get_drive_service
             service = get_drive_service()

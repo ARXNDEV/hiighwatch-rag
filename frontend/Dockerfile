@@ -1,46 +1,31 @@
-FROM node:18-alpine AS base
+FROM node:20-alpine AS builder
 
-# Step 1. Rebuild the source code only when needed
-FROM base AS builder
 WORKDIR /app
 
-# Copy dependencies and source code
-COPY package.json package-lock.json ./
-RUN npm ci
+# Copy package.json and package-lock.json
+COPY package*.json ./
+RUN npm ci --no-optional
 
+# Copy the rest of the application
 COPY . .
 
-# Disable telemetry during build
-ENV NEXT_TELEMETRY_DISABLED 1
-
-# Build the Next.js app
-# This will output a standalone directory because of next.config.ts
+# Build the Next.js application
 RUN npm run build
 
-# Step 2. Production image, copy all the files and run next
-FROM base AS runner
+# Production image
+FROM node:20-alpine AS runner
+
 WORKDIR /app
 
-ENV NODE_ENV production
-# Disable telemetry during runtime
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
 
-# Don't run production as root
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
+# Copy built files
+COPY --from=builder /app/next.config.ts ./
 COPY --from=builder /app/public ./public
-
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
 EXPOSE 3000
-ENV PORT 3000
-# set hostname to localhost
-ENV HOSTNAME "0.0.0.0"
 
+# Start command
 CMD ["node", "server.js"]

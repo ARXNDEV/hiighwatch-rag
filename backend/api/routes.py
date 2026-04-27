@@ -29,7 +29,7 @@ def auth_status():
 def auth_login():
     try:
         FRONTEND_URL = os.getenv("FRONTEND_URL", "https://hiighwatch-rag.vercel.app")
-        API_URL = os.getenv("API_URL", "https://hiighwatch-rag.onrender.com")
+        API_URL = os.getenv("API_URL", "https://hiighwatch-rag-3cdc.onrender.com")
         
         # We store the oauth state in a JSON file to survive FastAPI hot reloads
         # IMPORTANT: explicitly request access_type='offline' AND prompt='consent'
@@ -178,7 +178,7 @@ def get_chat_history():
 def auth_callback(state: str, code: str):
     try:
         FRONTEND_URL = os.getenv("FRONTEND_URL", "https://hiighwatch-rag.vercel.app")
-        API_URL = os.getenv("API_URL", "https://hiighwatch-rag.onrender.com")
+        API_URL = os.getenv("API_URL", "https://hiighwatch-rag-3cdc.onrender.com")
         
         import json
         states_file = "oauth_states.json"

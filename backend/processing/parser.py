@@ -21,6 +21,7 @@ def extract_text_from_pdf(filepath: str) -> str:
     text = ""
     for page in doc:
         text += page.get_text()
+    doc.close() # Free memory
     return text
 
 def extract_text_from_docx(filepath: str) -> str:

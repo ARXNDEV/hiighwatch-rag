@@ -2,11 +2,8 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import torch
 
-# Force PyTorch to use a single thread to save memory on Render Free Tier
 torch.set_num_threads(1)
 
-# Load a lightweight, fast, and high-quality embedding model
-# all-MiniLM-L6-v2 uses ~90MB of RAM
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
 def embed_chunks(chunks):
@@ -17,14 +14,12 @@ def embed_chunks(chunks):
         return chunks
         
     texts = [chunk['text'] for chunk in chunks]
-    # Reduce batch_size to 4 to prevent out of memory errors
     embeddings = model.encode(texts, batch_size=4, show_progress_bar=True)
     
-    # Optional: Clear torch cache if possible
     try:
         import gc
         gc.collect()
-    except:
+    except Exception:
         pass
     
     for i, chunk in enumerate(chunks):

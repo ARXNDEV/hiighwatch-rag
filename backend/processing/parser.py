@@ -2,7 +2,6 @@ import fitz # PyMuPDF
 import docx
 import os
 import re
-import concurrent.futures
 
 def clean_text(text: str) -> str:
     text = re.sub(r'\s+', ' ', text)
@@ -21,7 +20,7 @@ def extract_text_from_pdf(filepath: str) -> str:
     text = ""
     for page in doc:
         text += page.get_text()
-    doc.close() # Free memory
+    doc.close()
     return text
 
 def extract_text_from_docx(filepath: str) -> str:
@@ -70,9 +69,6 @@ def _process_single_file(file):
 
 def process_files(files):
     all_chunks = []
-    
-    # Do NOT use ThreadPoolExecutor on free tier. Processing PDFs in parallel 
-    # spikes memory massively. Process them sequentially instead.
     for file in files:
         chunk_list = _process_single_file(file)
         all_chunks.extend(chunk_list)

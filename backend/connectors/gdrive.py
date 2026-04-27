@@ -12,6 +12,14 @@ SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 TOKEN_FILE = 'token.json'
 SYNC_DIR = 'synced_docs'
 
+def _get_user_email(service):
+    try:
+        about = service.about().get(fields="user").execute()
+        return about['user']['emailAddress']
+    except Exception as e:
+        print("Could not get user email", e)
+        return "default_user"
+
 def get_drive_service():
     creds = None
     if os.path.exists(TOKEN_FILE):
@@ -57,14 +65,11 @@ def download_file(service, file_id, file_name, mime_type, modified_time, synced_
     file_path = os.path.join(SYNC_DIR, f"{file_id}{ext}")
 
     try:
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while done is False:
-            status, done = downloader.next_chunk()
-        
         with open(file_path, 'wb') as f:
-            f.write(fh.getvalue())
+            downloader = MediaIoBaseDownload(f, request)
+            done = False
+            while done is False:
+                status, done = downloader.next_chunk()
         
         # Update metadata in MongoDB
         from db import files_collection
@@ -93,57 +98,61 @@ def download_file(service, file_id, file_name, mime_type, modified_time, synced_
         print(f"Failed to download {file_name}: {e}")
         return None
 
-def sync_google_drive():
+def get_files_to_sync(page_size: int = 10, force: bool = False):
     service = get_drive_service()
     if not os.path.exists(SYNC_DIR):
         os.makedirs(SYNC_DIR)
 
-    from db import files_collection
-    try:
-        about = service.about().get(fields="user").execute()
-        user_email = about['user']['emailAddress']
-    except Exception as e:
-        print("Could not get user email", e)
-        user_email = "default_user"
+    user_email = _get_user_email(service)
 
-    # Fetch previously synced files from Mongo
+    from db import files_collection
     synced_files_cursor = files_collection.find({"user_email": user_email})
     synced_files = {f["file_id"]: f for f in synced_files_cursor}
 
     query = "mimeType='application/pdf' or mimeType='application/vnd.google-apps.document' or mimeType='text/plain'"
     results = service.files().list(
         q=query,
-        pageSize=10, # Increased back to 10 since processing is now in the background
+        pageSize=page_size,
         fields="nextPageToken, files(id, name, mimeType, modifiedTime)",
         orderBy="modifiedTime desc"
     ).execute()
     items = results.get('files', [])
 
+    if force:
+        return items, user_email
+
+    to_download = []
+    for item in items:
+        file_id = item['id']
+        modified_time = item['modifiedTime']
+        if file_id in synced_files and synced_files[file_id].get('modifiedTime') == modified_time:
+            continue
+        to_download.append(item)
+
+    return to_download, user_email
+
+def download_items(items, user_email):
+    if not items:
+        return []
+
+    service = get_drive_service()
+    from db import files_collection
+    synced_files_cursor = files_collection.find({"user_email": user_email})
+    synced_files = {f["file_id"]: f for f in synced_files_cursor}
+
     downloaded = []
-    
-    import concurrent.futures
-    
-    def process_item(item):
-        # Create a thread-local service
-        local_service = get_drive_service()
-        
+    for item in items:
         file_id = item['id']
         file_name = item['name']
         mime_type = item['mimeType']
         modified_time = item['modifiedTime']
-
-        if file_id in synced_files and synced_files[file_id].get('modifiedTime') == modified_time:
-            print(f"Skipping {file_name} because it is already synced and unmodified.")
-            return None
-
         print(f"Downloading {file_name}...")
-        return download_file(local_service, file_id, file_name, mime_type, modified_time, synced_files, user_email)
-
-    # Do NOT use ThreadPoolExecutor on free tier. Downloading in parallel 
-    # spikes memory massively. Process them sequentially instead.
-    for item in items:
-        result = process_item(item)
+        result = download_file(service, file_id, file_name, mime_type, modified_time, synced_files, user_email)
         if result:
             downloaded.append(result)
 
     return downloaded
+
+def sync_google_drive():
+    items, user_email = get_files_to_sync(page_size=10, force=False)
+    return download_items(items, user_email)

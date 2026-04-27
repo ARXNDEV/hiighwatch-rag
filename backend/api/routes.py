@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
-from connectors.gdrive import sync_google_drive, SCOPES, TOKEN_FILE
+from connectors.gdrive import get_files_to_sync, download_items, SCOPES, TOKEN_FILE
 from google_auth_oauthlib.flow import Flow
 from processing.parser import process_files
 from embedding.embedder import embed_chunks
@@ -257,10 +257,16 @@ def disconnect_drive_endpoint():
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-def background_sync_process(downloaded_files):
+def background_sync_process(items, user_email):
     try:
         import time
         start_time = time.time()
+
+        downloaded_files = download_items(items, user_email)
+        if not downloaded_files:
+            print("Background: No new files downloaded.")
+            return
+
         print(f"Background: Extracting text from {len(downloaded_files)} files...")
         chunks = process_files(downloaded_files)
         
@@ -287,7 +293,6 @@ def sync_drive_endpoint(background_tasks: BackgroundTasks, force: Optional[bool]
         import time
         start_time = time.time()
         
-        # --- Handle CORS Preflight / Basic Error Catching ---
         if not os.path.exists("token.json"):
             raise Exception("No token.json found. Please login to Google Drive first.")
             
@@ -311,24 +316,20 @@ def sync_drive_endpoint(background_tasks: BackgroundTasks, force: Optional[bool]
                     if os.path.isfile(fp):
                         os.remove(fp)
                 
-        # 1. Fetch files from Google Drive
-        print("Starting Google Drive Sync...")
-        downloaded_files = sync_google_drive()
-        
-        if not downloaded_files:
+        items, user_email = get_files_to_sync(page_size=10, force=bool(force))
+        if not items:
             return {"status": "success", "files_processed": 0, "message": "No new files to sync.", "files": []}
 
-        # 2. Queue for background processing
-        background_tasks.add_task(background_sync_process, downloaded_files)
+        background_tasks.add_task(background_sync_process, items, user_email)
 
         end_time = time.time()
-        print(f"Drive API completed in {round(end_time - start_time, 2)} seconds. Background indexing started.")
+        print(f"Sync queued in {round(end_time - start_time, 2)} seconds. Background indexing started.")
 
         return {
             "status": "success",
-            "files_processed": len(downloaded_files),
-            "message": f"Successfully queued {len(downloaded_files)} files. AI is indexing them in the background.",
-            "files": [{"id": f["id"], "name": f["name"]} for f in downloaded_files]
+            "files_processed": len(items),
+            "message": f"Successfully queued {len(items)} files. AI is indexing them in the background.",
+            "files": [{"id": f["id"], "name": f["name"]} for f in items]
         }
     except Exception as e:
         import traceback

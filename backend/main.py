@@ -1,13 +1,11 @@
 import os
 
-# --- CRITICAL MEMORY OPTIMIZATIONS FOR RENDER FREE TIER (512MB RAM) ---
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["MALLOC_ARENA_MAX"] = "2"
-# ----------------------------------------------------------------------
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,9 +25,9 @@ if frontend_url.endswith("/"):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        frontend_url, 
-        "https://hiighwatch-rag.vercel.app", 
-        "http://localhost:3000", 
+        frontend_url,
+        "https://hiighwatch-rag.vercel.app",
+        "http://localhost:3000",
         "http://127.0.0.1:3000"
     ],
     allow_credentials=True,

@@ -467,9 +467,9 @@ Question:
         messages.append({"role": "user", "content": prompt_with_context})
 
         # 3. Query Groq API
-        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
         if not os.getenv("GROQ_API_KEY"):
-            raise Exception("GROQ_API_KEY is not set.")
+            raise Exception("GROQ_API_KEY is not set in environment variables.")
+        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",

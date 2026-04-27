@@ -1,19 +1,21 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for faiss and fitz
-RUN apt-get update && apt-get install -y libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+# Install system dependencies required for compiling some Python packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Set an environment variable so the app knows it's in a Docker container
-ENV ENVIRONMENT=production
+# Ensure the synced_docs directory exists with proper permissions
+RUN mkdir -p synced_docs && chmod 777 synced_docs
 
 EXPOSE 8000
 
-# Use $PORT to allow cloud providers or standard Docker commands to inject the port
-CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Start command
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -345,7 +345,7 @@ def sync_drive_endpoint(force: Optional[bool] = False):
                     if os.path.isfile(fp):
                         os.remove(fp)
                 
-        items, user_email = get_files_to_sync(page_size=10, force=bool(force))
+        items, user_email = get_files_to_sync(page_size=2, force=bool(force))
         if not items:
             return {"status": "success", "files_processed": 0, "message": "No new files to sync.", "files": []}
 

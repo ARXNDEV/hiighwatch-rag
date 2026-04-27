@@ -81,14 +81,31 @@ def auth_login():
 def get_storage_stats():
     try:
         from search.vector_store import index, load_chunks
+        from db import files_collection
         import os
+        from connectors.gdrive import get_drive_service
+        
+        user_email = None
+        try:
+            service = get_drive_service()
+            about = service.about().get(fields="user").execute()
+            user_email = about['user']['emailAddress']
+        except Exception:
+            pass
         
         # Get FAISS vector count
         vector_count = index.ntotal if index else 0
         
+        # See how many files are tracked in the database
+        db_files_count = files_collection.count_documents({})
+        
         # Check if chunks are loaded indicating files are processed
         chunks = load_chunks()
-        processing_status = "Processing in background..." if vector_count == 0 else "Ready"
+        
+        # Check if this user currently has an active background sync running
+        is_processing = (user_email in active_syncs) if user_email else False
+        
+        processing_status = "Processing in background..." if is_processing else "Ready"
         
         # Estimate FAISS file size
         faiss_size_bytes = 0
@@ -263,8 +280,12 @@ def disconnect_drive_endpoint():
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+# Keep track of active background syncs
+active_syncs = set()
+
 def background_sync_process(items, user_email):
     try:
+        active_syncs.add(user_email)
         import time
         start_time = time.time()
 
@@ -292,6 +313,8 @@ def background_sync_process(items, user_email):
         import traceback
         print("Background Sync Error:")
         traceback.print_exc()
+    finally:
+        active_syncs.discard(user_email)
 
 @router.post("/sync-drive")
 def sync_drive_endpoint(background_tasks: BackgroundTasks, force: Optional[bool] = False):

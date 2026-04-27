@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 annotated-types==0.7.0
 anyio==4.12.1
 certifi==2026.4.22
@@ -62,7 +63,7 @@ starlette==0.36.3
 sympy==1.14.0
 threadpoolctl==3.6.0
 tokenizers==0.22.2
-torch==2.8.0
+torch==2.8.0+cpu
 tqdm==4.67.3
 transformers==4.57.6
 typing_extensions==4.15.0

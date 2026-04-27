@@ -3,12 +3,12 @@ import numpy as np
 import torch
 import os
 
-# Since we have unlimited memory, let PyTorch use all available CPU threads
-torch.set_num_threads(os.cpu_count() or 4)
+# Fall back to strict 1-thread CPU for Render Free Tier limits
+torch.set_num_threads(1)
 torch.set_grad_enabled(False) # We are only doing inference, disable gradients completely to save memory
 
-# all-MiniLM-L6-v2 is already very fast, let PyTorch decide the best device (CPU/MPS/CUDA)
-model = SentenceTransformer('all-MiniLM-L6-v2')
+# all-MiniLM-L6-v2 is already very fast, force CPU
+model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
 
 def embed_chunks(chunks):
     """
@@ -21,7 +21,7 @@ def embed_chunks(chunks):
     
     # Unlimited memory: Increase batch size to 64 for maximum throughput
     # normalize_embeddings=True makes the FAISS L2 distance mathematically equivalent to Cosine Similarity
-    embeddings = model.encode(texts, batch_size=64, show_progress_bar=True, normalize_embeddings=True)
+    embeddings = model.encode(texts, batch_size=8, show_progress_bar=True, normalize_embeddings=True)
     
     try:
         import gc

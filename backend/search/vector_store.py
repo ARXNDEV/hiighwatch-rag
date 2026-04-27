@@ -11,7 +11,8 @@ DIMENSION = 384 # Dimension for 'all-MiniLM-L6-v2'
 def load_faiss_index():
     if os.path.exists(INDEX_FILE):
         return faiss.read_index(INDEX_FILE)
-    return faiss.IndexFlatL2(DIMENSION)
+    # Using IndexFlatIP for Cosine Similarity (requires normalized embeddings)
+    return faiss.IndexFlatIP(DIMENSION)
 
 def load_chunks():
     if os.path.exists(CHUNKS_FILE):
@@ -59,7 +60,7 @@ def search_faiss(query, k=5, filters=None):
     # If filters are applied, we might need to search for more chunks to find enough matches
     search_k = k * 10 if filters else k
 
-    query_embedding = model.encode([query]).astype('float32')
+    query_embedding = model.encode([query], normalize_embeddings=True).astype('float32')
     distances, indices = index.search(query_embedding, search_k)
 
     results = []

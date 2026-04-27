@@ -2,9 +2,12 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import torch
 
+# Force torch to use minimum threads to prevent CPU thrashing and memory spikes on Render free tier
 torch.set_num_threads(1)
+torch.set_grad_enabled(False) # We are only doing inference, disable gradients completely to save huge memory
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+# all-MiniLM-L6-v2 is already very fast, but forcing it to CPU explicitly prevents PyTorch from searching for GPUs
+model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
 
 def embed_chunks(chunks):
     """
@@ -14,8 +17,10 @@ def embed_chunks(chunks):
         return chunks
         
     texts = [chunk['text'] for chunk in chunks]
-    # Increase batch size from 4 to 8 to process vectors faster, memory should hold up now that files are sequential
-    embeddings = model.encode(texts, batch_size=8, show_progress_bar=True)
+    
+    # Batch size 16 is the sweet spot for CPU inference speed vs memory on 512MB RAM limits
+    # normalize_embeddings=True makes the FAISS L2 distance mathematically equivalent to Cosine Similarity
+    embeddings = model.encode(texts, batch_size=16, show_progress_bar=True, normalize_embeddings=True)
     
     try:
         import gc

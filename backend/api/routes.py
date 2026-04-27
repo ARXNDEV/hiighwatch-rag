@@ -405,13 +405,7 @@ def ask_endpoint(req: AskRequest):
 
         # Cache key based on query and filters
         cache_key = hashlib.md5(f"{req.query}_{req.filter_metadata}".encode()).hexdigest()
-        if cache_key in llm_cache:
-            return AskResponse(
-                answer=llm_cache[cache_key]['answer'],
-                sources=llm_cache[cache_key]['sources'],
-                cached=True
-            )
-
+        
         # 1. Search FAISS for top chunks, increasing K significantly because we have smaller 250-word chunks now
         top_chunks = search_faiss(req.query, k=15, filters=req.filter_metadata)
         

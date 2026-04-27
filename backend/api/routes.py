@@ -408,8 +408,8 @@ def ask_endpoint(req: AskRequest):
                 cached=True
             )
 
-        # 1. Search FAISS for top-5 chunks, with optional metadata filtering
-        top_chunks = search_faiss(req.query, k=5, filters=req.filter_metadata)
+        # 1. Search FAISS for top chunks, increasing K significantly because we have smaller 250-word chunks now
+        top_chunks = search_faiss(req.query, k=15, filters=req.filter_metadata)
         
         if not top_chunks:
             return AskResponse(

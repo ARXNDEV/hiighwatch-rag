@@ -349,20 +349,29 @@ def sync_drive_endpoint(force: Optional[bool] = False):
                     if os.path.isfile(fp):
                         os.remove(fp)
                 
-        items, user_email = get_files_to_sync(page_size=3, force=bool(force))
+        items, user_email = get_files_to_sync(page_size=1, force=bool(force))
         if not items:
             return {"status": "success", "files_processed": 0, "message": "No new files to sync.", "files": []}
 
+        import gc
+        
         # Process files synchronously instead of in the background
         downloaded_files = download_items(items, user_email)
+        gc.collect()
+        
         if downloaded_files:
             print(f"Extracting text from {len(downloaded_files)} files...")
             chunks = process_files(downloaded_files)
+            gc.collect()
+            
             if chunks:
                 print(f"Embedding {len(chunks)} chunks...")
                 embedded_chunks = embed_chunks(chunks)
+                gc.collect()
+                
                 print("Adding chunks to FAISS...")
                 add_to_faiss(embedded_chunks)
+                gc.collect()
 
         end_time = time.time()
         print(f"Sync and indexing completed in {round(end_time - start_time, 2)} seconds.")

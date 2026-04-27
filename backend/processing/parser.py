@@ -70,9 +70,11 @@ def _process_single_file(file):
     return local_chunks
 
 def process_files(files):
+    import gc
     all_chunks = []
     for file in files:
         chunk_list = _process_single_file(file)
         all_chunks.extend(chunk_list)
+        gc.collect()
             
     return all_chunks

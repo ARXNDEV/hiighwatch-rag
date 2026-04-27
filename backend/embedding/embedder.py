@@ -21,7 +21,7 @@ def embed_chunks(chunks):
     
     # Unlimited memory: Increase batch size to 64 for maximum throughput
     # normalize_embeddings=True makes the FAISS L2 distance mathematically equivalent to Cosine Similarity
-    embeddings = model.encode(texts, batch_size=8, show_progress_bar=True, normalize_embeddings=True)
+    embeddings = model.encode(texts, batch_size=4, show_progress_bar=False, normalize_embeddings=True)
     
     try:
         import gc

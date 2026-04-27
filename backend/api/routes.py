@@ -73,7 +73,7 @@ def auth_login():
         with open(states_file, "w") as f:
             json.dump(states, f)
         
-        return {"url": auth_url}
+        return RedirectResponse(url=auth_url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

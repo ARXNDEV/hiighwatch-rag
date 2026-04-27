@@ -6,6 +6,7 @@ import { ArrowRight, Database, Search, Zap, LogIn, Loader2, Sparkles, ShieldChec
 import { useState, useEffect, Suspense } from "react";
 import axios from "axios";
 import { useSearchParams } from "next/navigation";
+import { getApiBaseUrl } from "@/utils/apiBaseUrl";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -260,7 +261,7 @@ function HomeContent() {
     // Check auth status on mount
     const checkAuth = async () => {
       try {
-        const statusRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/auth/status`);
+        const statusRes = await axios.get(`${getApiBaseUrl()}/auth/status`);
         if (statusRes.data.authenticated) {
           setIsAuthenticated(true);
         }
@@ -274,38 +275,32 @@ function HomeContent() {
   const handleDashboardClick = async () => {
     setLoading(true);
     try {
-      const statusRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/auth/status`);
+      const statusRes = await axios.get(`${getApiBaseUrl()}/auth/status`);
       if (statusRes.data.authenticated) {
         window.location.href = "/dashboard";
         return;
       } else {
-        // If not authenticated, initiate login
-        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/auth/login`);
-        if (res.data.url) {
-          window.location.href = res.data.url;
-        }
+        // If not authenticated, initiate login by navigating to the backend
+        window.location.href = `${getApiBaseUrl()}/auth/login`;
       }
     } catch (error) {
-      console.error("Failed to initiate login:", error);
-      setLoading(false);
+      console.error("Failed to check auth, trying to login anyway:", error);
+      window.location.href = `${getApiBaseUrl()}/auth/login`;
     }
   };
 
   const handleLogin = async () => {
     setLoading(true);
     try {
-      const statusRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/auth/status`);
+      const statusRes = await axios.get(`${getApiBaseUrl()}/auth/status`);
       if (statusRes.data.authenticated) {
         window.location.href = "/dashboard";
         return;
       }
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/auth/login`);
-      if (res.data.url) {
-        window.location.href = res.data.url;
-      }
+      window.location.href = `${getApiBaseUrl()}/auth/login`;
     } catch (error) {
-      console.error("Failed to initiate login:", error);
-      setLoading(false);
+      console.error("Failed to check auth, trying to login anyway:", error);
+      window.location.href = `${getApiBaseUrl()}/auth/login`;
     }
   };
 

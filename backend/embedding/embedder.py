@@ -14,7 +14,8 @@ def embed_chunks(chunks):
         return chunks
         
     texts = [chunk['text'] for chunk in chunks]
-    embeddings = model.encode(texts, batch_size=4, show_progress_bar=True)
+    # Increase batch size from 4 to 8 to process vectors faster, memory should hold up now that files are sequential
+    embeddings = model.encode(texts, batch_size=8, show_progress_bar=True)
     
     try:
         import gc

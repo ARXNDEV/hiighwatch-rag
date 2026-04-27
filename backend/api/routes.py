@@ -80,11 +80,15 @@ def auth_login():
 @router.get("/storage/stats")
 def get_storage_stats():
     try:
-        from search.vector_store import index
+        from search.vector_store import index, load_chunks
         import os
         
         # Get FAISS vector count
         vector_count = index.ntotal if index else 0
+        
+        # Check if chunks are loaded indicating files are processed
+        chunks = load_chunks()
+        processing_status = "Processing in background..." if vector_count == 0 else "Ready"
         
         # Estimate FAISS file size
         faiss_size_bytes = 0
@@ -105,7 +109,8 @@ def get_storage_stats():
             "vectors": vector_count,
             "faiss_size_kb": round(faiss_size_bytes / 1024, 2),
             "docs_size_kb": round(docs_size_bytes / 1024, 2),
-            "docs_count": docs_count
+            "docs_count": docs_count,
+            "status": processing_status
         }
     except Exception as e:
         import traceback
@@ -114,7 +119,8 @@ def get_storage_stats():
             "vectors": 0,
             "faiss_size_kb": 0,
             "docs_size_kb": 0,
-            "docs_count": 0
+            "docs_count": 0,
+            "status": "Error"
         }
 @router.get("/chat/history")
 def get_chat_history():

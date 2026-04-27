@@ -9,9 +9,38 @@ import { getApiBaseUrl } from "@/utils/apiBaseUrl";
 
 export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: (docs: {id: string, name: string, status: string}[]) => void, autoSync?: boolean }) {
   const [syncing, setSyncing] = useState(false);
-  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "success" | "error" | "processing">("idle");
   const [message, setMessage] = useState("");
   const router = useRouter();
+
+  useEffect(() => {
+    // Poll for storage stats to know when background processing is done
+    let interval: NodeJS.Timeout;
+    
+    const checkStatus = async () => {
+      try {
+        const res = await axios.get(`${getApiBaseUrl()}/storage/stats`);
+        if (res.data.status === "Processing in background...") {
+          setStatus("processing");
+          setMessage("AI is extracting text and indexing documents...");
+        } else if (status === "processing" && res.data.status === "Ready") {
+          setStatus("success");
+          setMessage("Indexing complete! Documents are ready to be queried.");
+        }
+      } catch (err) {
+        // ignore polling errors
+      }
+    };
+
+    if (status === "processing" || status === "success") {
+       checkStatus();
+       interval = setInterval(checkStatus, 5000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [status]);
 
   useEffect(() => {
     if (autoSync) {
@@ -25,8 +54,8 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
     setMessage(force ? "Force syncing from Google Drive..." : "Syncing from Google Drive...");
     try {
       const res = await axios.post(`${getApiBaseUrl()}/sync-drive${force ? "?force=true" : ""}`);
-      setStatus("success");
-      setMessage(res.data.message || `Successfully synced ${res.data.files_processed} files.`);
+      setStatus("processing");
+      setMessage(res.data.message || `Successfully queued ${res.data.files_processed} files.`);
       
       if (res.data.files && res.data.files.length > 0) {
         onSyncSuccess(res.data.files.map((f: any) => ({
@@ -97,10 +126,14 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
           className={`mt-2 p-3 rounded-xl flex items-start gap-2.5 text-xs ${
-            status === "success" ? "bg-white/[0.05] border border-white/10 text-white/80" : "bg-red-500/10 border border-red-500/20 text-red-400"
+            status === "success" ? "bg-white/[0.05] border border-white/10 text-white/80" : 
+            status === "processing" ? "bg-blue-500/10 border border-blue-500/20 text-blue-300" :
+            "bg-red-500/10 border border-red-500/20 text-red-400"
           }`}
         >
-          {status === "success" ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-white/50" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
+          {status === "success" ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-white/50" /> : 
+           status === "processing" ? <Loader2 className="w-3.5 h-3.5 shrink-0 mt-0.5 animate-spin text-blue-400" /> :
+           <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
           <span className="leading-relaxed">{message}</span>
         </motion.div>
       )}

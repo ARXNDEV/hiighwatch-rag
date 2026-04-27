@@ -8,7 +8,13 @@ export function getApiBaseUrl() {
     return "https://hiighwatch-rag-3cdc.onrender.com";
   }
 
-  // 2. Fallback to local dev server ONLY if we are truly running locally
+  // 2. Check for explicit env var (useful for local testing)
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl && envUrl.trim().length > 0) {
+    return envUrl.replace(/\/$/, "");
+  }
+
+  // 3. Fallback to local dev server ONLY if we are truly running locally
   return "http://127.0.0.1:8000";
 }
 

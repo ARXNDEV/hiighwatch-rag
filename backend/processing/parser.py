@@ -7,10 +7,11 @@ def clean_text(text: str) -> str:
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
-def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100):
+def chunk_text(text: str, chunk_size: int = 250, overlap: int = 50):
     words = text.split()
     chunks = []
-    # Make chunks larger to reduce the number of chunks Sentencetransformer has to process
+    # all-MiniLM-L6-v2 has a max token length of 256. If we make chunks larger than 250 words, 
+    # the embedding model truncates the rest of the text, causing massive data loss and broken RAG!
     for i in range(0, len(words), max(1, chunk_size - overlap)):
         chunk = " ".join(words[i:i + chunk_size])
         chunks.append(chunk)
@@ -56,7 +57,7 @@ def _process_single_file(file):
         if not cleaned_text:
             return []
 
-        file_chunks = chunk_text(cleaned_text, chunk_size=1000, overlap=100)
+        file_chunks = chunk_text(cleaned_text, chunk_size=250, overlap=50)
         for i, c in enumerate(file_chunks):
             local_chunks.append({
                 "id": f"{file['id']}_chunk_{i}",

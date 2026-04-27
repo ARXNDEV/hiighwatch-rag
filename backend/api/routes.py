@@ -345,7 +345,7 @@ def sync_drive_endpoint(force: Optional[bool] = False):
                     if os.path.isfile(fp):
                         os.remove(fp)
                 
-        items, user_email = get_files_to_sync(page_size=2, force=bool(force))
+        items, user_email = get_files_to_sync(page_size=20, force=bool(force))
         if not items:
             return {"status": "success", "files_processed": 0, "message": "No new files to sync.", "files": []}
 
@@ -366,7 +366,7 @@ def sync_drive_endpoint(force: Optional[bool] = False):
         return {
             "status": "success",
             "files_processed": len(items),
-            "message": f"Successfully synced and indexed {len(items)} files.",
+            "message": f"Successfully synced and indexed {len(downloaded_files)} files. AI is ready.",
             "files": [{"id": f["id"], "name": f["name"]} for f in items]
         }
     except Exception as e:

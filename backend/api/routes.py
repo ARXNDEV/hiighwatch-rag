@@ -384,8 +384,8 @@ def sync_drive_endpoint(force: Optional[bool] = False):
 def ask_endpoint(req: AskRequest):
     try:
         from connectors.gdrive import get_drive_service
-        service = get_drive_service()
         try:
+            service = get_drive_service()
             about = service.about().get(fields="user").execute()
             user_email = about['user']['emailAddress']
         except Exception:

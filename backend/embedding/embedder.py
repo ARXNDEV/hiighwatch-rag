@@ -17,8 +17,15 @@ def embed_chunks(chunks):
         return chunks
         
     texts = [chunk['text'] for chunk in chunks]
-    # Reduce batch_size from 32 to 8 to prevent memory spikes during inference
-    embeddings = model.encode(texts, batch_size=8, show_progress_bar=True)
+    # Reduce batch_size to 4 to prevent out of memory errors
+    embeddings = model.encode(texts, batch_size=4, show_progress_bar=True)
+    
+    # Optional: Clear torch cache if possible
+    try:
+        import gc
+        gc.collect()
+    except:
+        pass
     
     for i, chunk in enumerate(chunks):
         chunk['embedding'] = embeddings[i]

@@ -139,12 +139,11 @@ def sync_google_drive():
         print(f"Downloading {file_name}...")
         return download_file(local_service, file_id, file_name, mime_type, modified_time, synced_files, user_email)
 
-    # Use max_workers=2 to prevent excessive memory usage on Render Free Tier
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [executor.submit(process_item, item) for item in items]
-        for future in concurrent.futures.as_completed(futures):
-            result = future.result()
-            if result:
-                downloaded.append(result)
+    # Do NOT use ThreadPoolExecutor on free tier. Downloading in parallel 
+    # spikes memory massively. Process them sequentially instead.
+    for item in items:
+        result = process_item(item)
+        if result:
+            downloaded.append(result)
 
     return downloaded

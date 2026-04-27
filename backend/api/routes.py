@@ -284,21 +284,25 @@ def sync_drive_endpoint(force: bool = False):
                         os.remove(fp)
                 
         # 1. Fetch files from Google Drive
+        print("Starting Google Drive Sync...")
         downloaded_files = sync_google_drive()
         
         if not downloaded_files:
             return {"status": "success", "files_processed": 0, "message": "No new files to sync.", "files": []}
 
         # 2. Extract and chunk text
+        print(f"Extracting text from {len(downloaded_files)} files...")
         chunks = process_files(downloaded_files)
         
         if not chunks:
             return {"status": "success", "files_processed": len(downloaded_files), "message": "Files downloaded but no text extracted.", "files": [{"id": f["id"], "name": f["name"]} for f in downloaded_files]}
 
         # 3. Embed chunks (Parallelized)
+        print(f"Embedding {len(chunks)} chunks...")
         embedded_chunks = embed_chunks(chunks)
 
         # 4. Add to FAISS vector store
+        print("Adding chunks to FAISS...")
         add_to_faiss(embedded_chunks)
 
         end_time = time.time()
@@ -316,6 +320,9 @@ def sync_drive_endpoint(force: bool = False):
         error_msg = str(e)
         if "Google Drive API has not been used" in error_msg:
             error_msg = "Google Drive API is not enabled. Visit https://console.cloud.google.com/apis/library/drive.googleapis.com to enable it."
+        # If we hit an out of memory error, throw a clear exception
+        if "killed" in error_msg.lower() or "memory" in error_msg.lower():
+            error_msg = "The server ran out of memory while processing your PDFs. Try syncing fewer or smaller files."
         raise HTTPException(status_code=500, detail=error_msg)
 
 @router.post("/ask", response_model=AskResponse)

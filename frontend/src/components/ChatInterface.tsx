@@ -6,6 +6,7 @@ import { Send, Bot, User, Sparkles, FileText, Loader2, ArrowRight } from "lucide
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import axios from "axios";
+import { getApiBaseUrl } from "@/utils/apiBaseUrl";
 
 interface Message {
   role: "user" | "ai";
@@ -23,7 +24,7 @@ export function ChatInterface() {
     // Load chat history on mount
     const fetchHistory = async () => {
       try {
-        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/chat/history`);
+        const res = await axios.get(`${getApiBaseUrl()}/chat/history`);
         if (res.data && res.data.history) {
           setMessages(res.data.history);
         }
@@ -64,7 +65,7 @@ export function ChatInterface() {
     setLoading(true);
 
     try {
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/ask`, { query: userQuery });
+      const res = await axios.post(`${getApiBaseUrl()}/ask`, { query: userQuery });
       setMessages((prev) => [
         ...prev,
         {

@@ -8,6 +8,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import axios from "axios";
 import { Sparkles } from "lucide-react";
 import Link from "next/link";
+import { getApiBaseUrl } from "@/utils/apiBaseUrl";
 
 function DashboardContent() {
   const [docs, setDocs] = useState<{ id: string, name: string, status: string }[]>([]);
@@ -19,7 +20,7 @@ function DashboardContent() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/auth/status`);
+        const res = await axios.get(`${getApiBaseUrl()}/auth/status`);
         if (res.data.authenticated) {
           setIsAuthenticated(true);
         } else {

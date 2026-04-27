@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Cloud, Loader2, CheckCircle2, AlertCircle, LogOut } from "lucide-react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { getApiBaseUrl } from "@/utils/apiBaseUrl";
 
 export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: (docs: {id: string, name: string, status: string}[]) => void, autoSync?: boolean }) {
   const [syncing, setSyncing] = useState(false);
@@ -23,7 +24,7 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
     setStatus("idle");
     setMessage(force ? "Force syncing from Google Drive..." : "Syncing from Google Drive...");
     try {
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/sync-drive${force ? "?force=true" : ""}`);
+      const res = await axios.post(`${getApiBaseUrl()}/sync-drive${force ? "?force=true" : ""}`);
       setStatus("success");
       setMessage(res.data.message || `Successfully synced ${res.data.files_processed} files.`);
       
@@ -76,7 +77,7 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
       <button
         onClick={async () => {
           try {
-            await axios.post(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/disconnect-drive`);
+            await axios.post(`${getApiBaseUrl()}/disconnect-drive`);
             await new Promise(r => setTimeout(r, 500));
             router.push("/");
           } catch (err: any) {

@@ -28,8 +28,8 @@ def auth_status():
 @router.get("/auth/login")
 def auth_login():
     try:
-        FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-        API_URL = os.getenv("API_URL", "http://localhost:8000")
+        FRONTEND_URL = os.getenv("FRONTEND_URL", "https://hiighwatch-rag.vercel.app")
+        API_URL = os.getenv("API_URL", "https://hiighwatch-rag.onrender.com")
         
         # We store the oauth state in a JSON file to survive FastAPI hot reloads
         # IMPORTANT: explicitly request access_type='offline' AND prompt='consent'
@@ -154,8 +154,8 @@ def get_chat_history():
 @router.get("/auth/callback")
 def auth_callback(state: str, code: str):
     try:
-        FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-        API_URL = os.getenv("API_URL", "http://localhost:8000")
+        FRONTEND_URL = os.getenv("FRONTEND_URL", "https://hiighwatch-rag.vercel.app")
+        API_URL = os.getenv("API_URL", "https://hiighwatch-rag.onrender.com")
         
         import json
         states_file = "oauth_states.json"

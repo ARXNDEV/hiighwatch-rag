@@ -75,9 +75,20 @@ export function ChatInterface() {
         },
       ]);
     } catch (err: any) {
+      let errorMsg = "Sorry, I encountered an error answering that.";
+      
+      // Handle rate limits or other specific errors from the backend
+      if (err.response?.data?.detail) {
+        if (typeof err.response.data.detail === 'string' && err.response.data.detail.includes('Rate limit reached')) {
+          errorMsg = "The AI rate limit has been reached for today. Please wait a while or upgrade your API key to continue chatting.";
+        } else {
+          errorMsg = `Error: ${err.response.data.detail}`;
+        }
+      }
+
       setMessages((prev) => [
         ...prev,
-        { role: "ai", content: "Sorry, I encountered an error answering that." },
+        { role: "ai", content: errorMsg },
       ]);
     } finally {
       setLoading(false);

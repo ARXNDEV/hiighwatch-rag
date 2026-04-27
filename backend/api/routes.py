@@ -497,14 +497,19 @@ Question:
             raise Exception("GROQ_API_KEY is not set in environment variables.")
         client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=messages,
-            temperature=0.4,
-            max_tokens=2048,
-        )
-
-        answer = completion.choices[0].message.content
+        try:
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=messages,
+                temperature=0.4,
+                max_tokens=2048,
+            )
+            answer = completion.choices[0].message.content
+        except Exception as e:
+            if "rate_limit_exceeded" in str(e).lower() or "429" in str(e):
+                raise Exception("The AI rate limit has been reached for today. Please wait a while or upgrade your API key to continue chatting.")
+            else:
+                raise e
         
         # Save to cache
         llm_cache[cache_key] = {

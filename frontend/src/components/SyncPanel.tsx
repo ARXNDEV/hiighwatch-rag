@@ -69,7 +69,8 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
       router.replace("/dashboard");
     } catch (err: any) {
       setStatus("error");
-      setMessage(err.response?.data?.detail || "An error occurred during sync.");
+      const errorMsg = err.response?.data?.detail;
+      setMessage(errorMsg || "An error occurred during sync. The server might have timed out because the files were too large. Please click Sync again to continue.");
     } finally {
       setSyncing(false);
     }

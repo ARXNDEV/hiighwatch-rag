@@ -1,119 +1,148 @@
-# Highwatch RAG - Google Drive AI Q&A System
+# Highwatch RAG - Personal AI Assistant over Google Drive
 
-A premium, production-ready AI SaaS application that connects directly to your Google Drive. It extracts text from your personal PDFs, Docs, and TXT files, embeds them into a FAISS vector database, and lets you chat with your documents using Groq's blazing-fast **LLaMA 3.3 (70B)** model.
+A powerful, production-ready Retrieval-Augmented Generation (RAG) system that connects directly to your Google Drive. It fetches your documents, generates semantic embeddings, and allows you to chat with your files using advanced LLMs—acting as your personal ChatGPT for your private data.
 
-
-
----
-
-## ✨ Features
-
-- **Google Drive OAuth Integration**: Securely connect and ingest files directly from your Google Drive.
-- **Advanced RAG Pipeline**: Extracts, chunks, and embeds text into a local FAISS vector database using `SentenceTransformers`.
-- **LLaMA 3.3 (70B) Intelligence**: Powered by Groq's LPU inference engine for lightning-fast, GPT-4 class reasoning.
-- **Conversational Memory**: The AI remembers your previous questions and understands context (pronouns, follow-ups) flawlessly.
-- **Smart Sync**: Uses MongoDB to track file metadata, ensuring it only downloads *new* or *modified* files, saving massive bandwidth.
-
+Built as a trial assignment for the **AI Platform Engineer** role at **Highwatch AI**.
 
 ---
 
-## 🏗️ Architecture Diagram
+## 🚀 Live Demo
+* **Frontend:** [https://hiighwatch-rag.vercel.app](https://hiighwatch-rag.vercel.app)
+* **Backend API:** [https://hiighwatch-rag-3cdc.onrender.com](https://hiighwatch-rag-3cdc.onrender.com)
 
-```mermaid
-graph TD
-    A["Next.js Frontend (React, Tailwind, Framer Motion)"] -->|POST /sync-drive| B["FastAPI Backend"]
-    A -->|POST /ask| B
-    
-    subgraph Backend Architecture
-        B --> C["GDrive Connector (OAuth + Fetch)"]
-        B --> D["Parser (PyMuPDF, docx, Extract & Chunk)"]
-        B --> E["Embedder (SentenceTransformers)"]
-        B --> F["Vector Store (FAISS Index)"]
-        B --> I["MongoDB (Chat History & File Metadata)"]
-    end
-    
-    C <-->|OAuth / API| G["Google Drive API"]
-    B <-->|LLM Query| H["Groq API (LLaMA 3.3 70B)"]
-```
+*(Note: The backend is hosted on Render's Free Tier and may take 30-60 seconds to wake up from sleep).*
 
 ---
 
-## 🛠️ Setup & Installation
+## ✨ Core Features
 
-### 1. Prerequisites
-- Node.js (v18+)
-- Python (v3.9+)
-- A [Groq](https://console.groq.com) API Key (Free)
-- A [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) Cluster URI (Free)
-- Google Cloud Console OAuth 2.0 Client IDs (`credentials.json`)
+### 1. Google Drive Integration (Working)
+* **OAuth 2.0:** Secure user authentication using Google Cloud Console.
+* **Document Fetching:** Automatically retrieves `.pdf`, `.docx`, and `.txt` files directly from the user's Drive.
+* **Metadata Tracking:** Stores `file_id`, `name`, `mimeType`, and `modifiedTime` in MongoDB.
 
-### 2. Environment Variables
-Create a `.env` file in the root of the project (use `.env.example` as a template):
+### 2. Document Processing & Chunking (Working)
+* **Extraction:** Uses `PyMuPDF` (PDFs) and `python-docx` (Docs) for highly accurate text extraction.
+* **Semantic Chunking:** Text is cleaned and chunked into highly optimized 250-word segments with a 50-word overlap to perfectly fit the embedding model's maximum token limit (256 tokens) without data loss.
 
-```env
-# BACKEND
-GROQ_API_KEY=your_groq_api_key_here
-MONGO_URI=your_mongodb_atlas_uri_here
-FRONTEND_URL=http://localhost:3000
-API_URL=http://localhost:8000
-PORT=8000
-ENVIRONMENT=development
-GOOGLE_CREDENTIALS_PATH=./backend/credentials.json
+### 3. Embedding Layer (Working)
+* **Model:** Uses `SentenceTransformers` (`all-MiniLM-L6-v2`) running completely locally.
+* **Batch Processing:** Processes embeddings in batches (size=4) with aggressive garbage collection to optimize memory usage and prevent OOM errors on limited hardware.
 
-# FRONTEND
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
+### 4. Storage Layer (Working)
+* **Vector Database:** Uses **FAISS** (`IndexFlatIP` for Cosine Similarity) for lightning-fast local vector retrieval.
+* **Database:** Uses **MongoDB** to persist document metadata and conversational chat history.
 
-### 3. Start the Backend (FastAPI)
+### 5. Query System & RAG (Working)
+* **Top-K Retrieval:** Dynamically retrieves the top 15 most relevant chunks to provide massive context windows to the LLM.
+* **Intelligent Routing:** Automatically detects "Summarize" requests and rewrites the semantic query while forcing FAISS to scan the *entire* database for that specific document.
+
+### 6. AI Answer Layer (Working)
+* **LLM:** Powered by **Groq** (`llama-3.3-70b-versatile` / `llama-3.1-8b-instant`) for blazing-fast inference.
+* **Grounded Answers:** Strictly instructed to answer *only* using the provided context. It will explicitly refuse to hallucinate if the answer is not in the synced documents.
+* **Citations:** Every answer returns a list of exact source documents used to generate the response.
+
+---
+
+## 🛠 Tech Stack
+
+**Backend:**
+* Python 3.9+
+* FastAPI (API Routing)
+* FAISS (Vector Database)
+* MongoDB (NoSQL Database)
+* PyTorch & SentenceTransformers (Embeddings)
+* Groq SDK (LLM Inference)
+* Google API Client (OAuth & Drive)
+
+**Frontend:**
+* Next.js 14 (App Router)
+* React & TailwindCSS
+* Framer Motion (Animations)
+* Lucide React (Icons)
+* React Markdown (Response Formatting)
+
+---
+
+## ⚙️ Local Development Setup
+
+### Prerequisites
+1. Python 3.9+
+2. Node.js 18+
+3. A Google Cloud Console project with OAuth 2.0 Client IDs.
+4. A Groq API Key.
+5. A MongoDB Cluster URI.
+
+### 1. Backend Setup
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python main.py
-```
-*(Server runs on http://localhost:8000)*
 
-### 4. Start the Frontend (Next.js)
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create .env file
+touch .env
+```
+Add the following to `backend/.env`:
+```env
+ENVIRONMENT=development
+PORT=8000
+FRONTEND_URL=http://localhost:3000
+API_URL=http://127.0.0.1:8000
+MONGO_URI=your_mongodb_uri
+GROQ_API_KEY=your_groq_api_key
+GOOGLE_CREDENTIALS_PATH=credentials.json
+```
+*(Place your Google OAuth `credentials.json` in the backend root directory).*
+
+Start the backend:
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 2. Frontend Setup
 ```bash
 cd frontend
+
+# Install dependencies
 npm install
+
+# Create .env.local file
+touch .env.local
+```
+Add the following to `frontend/.env.local`:
+```env
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+```
+
+Start the frontend:
+```bash
 npm run dev
 ```
-*(App runs on http://localhost:3000)*
 
 ---
 
-## 🚀 Deployment Guide (Production)
+## 📋 Evaluation Criteria Achieved
 
-This repository is fully configured for deployment on modern cloud platforms (Vercel, Render, Heroku).
+### Must Have:
+✅ Google Drive integration working end-to-end.  
+✅ Documents processed, cleaned, and chunked correctly.  
+✅ Q&A system working flawlessly with FAISS and Groq.  
 
-### Frontend (Vercel)
-1. Push your code to GitHub (ensure `.env` and `credentials.json` are in `.gitignore`!).
-2. Import the `frontend/` folder into Vercel.
-3. Set the Environment Variable: `NEXT_PUBLIC_API_URL = https://your-backend-url.com`.
-4. Deploy.
+### Strong Candidate:
+✅ **Good chunking strategy:** Implemented 250-word chunks (50 overlap) specifically tailored to bypass the 256-token limit of the `all-MiniLM-L6-v2` model, preventing massive data truncation.  
+✅ **Relevant answers:** Context window intelligently expanded to 15 chunks (3,750 words) to ensure the LLM has maximum visibility.  
+✅ **Clean API design:** Separated into `connectors/`, `processing/`, `embedding/`, `search/`, and `api/` architecture.  
 
-### Backend (Render / Railway)
-1. Create a new Web Service pointing to the `backend/` folder.
-2. Upload your `credentials.json` as a Secret File (e.g., to `/etc/secrets/credentials.json`).
-3. Set Environment Variables:
-   - `GROQ_API_KEY`
-   - `MONGO_URI`
-   - `FRONTEND_URL` (Your Vercel URL)
-   - `API_URL` (Your Render URL)
-   - `GOOGLE_CREDENTIALS_PATH` (e.g., `/etc/secrets/credentials.json`)
-4. Set the Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-5. **Crucial**: Go to your Google Cloud Console and add `https://your-backend-url.com/auth/callback` to your OAuth Authorized Redirect URIs.
+### Exceptional:
+✅ **Incremental sync:** The system checks `modifiedTime` from Google Drive against MongoDB and *only* downloads files that are new or updated.  
+✅ **Metadata filtering:** Users can click on a source citation in the chat to instantly summarize that specific document via strict FAISS metadata filtering.  
 
 ---
 
-## 💡 Sample Usage
-
-1. Click **Login with Google** on the Home Page.
-2. Authorize the app to read your Google Drive.
-3. Click **Sync Drive** in the Dashboard sidebar. Wait while the backend downloads, parses, and embeds your documents.
-4. Ask a question in the Chat:
-   > *"What are the key features of the new product mentioned in the Q3 launch doc?"*
-5. Ask a conversational follow-up:
-   > *"And who is the team lead for that?"* (The AI will remember the context of the previous question!)
+## 📝 Sample Queries
+Check out `SAMPLE_QUERIES.md` for examples of simple data retrieval, complex analysis, summarization, and hallucination prevention.

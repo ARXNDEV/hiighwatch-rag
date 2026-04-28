@@ -458,8 +458,8 @@ def ask_endpoint(req: AskRequest):
             cursor = cursor.sort("timestamp", 1)
         except Exception:
             pass
-        # Only take the last 10 messages for context window size limits
-        chat_history_list = list(cursor)[-10:]
+        # Only take the last 6 messages for context window size limits
+        chat_history_list = list(cursor)[-6:]
         
         system_prompt = """You are Highwatch, an advanced, highly intelligent conversational AI assistant (similar to ChatGPT) integrated directly into the user's Google Drive. 
 Your primary goal is to help the user understand, analyze, and extract insights from their synced documents.
@@ -502,7 +502,7 @@ Question:
                 model="llama-3.1-8b-instant", # Switched to the currently supported 8B model on Groq
                 messages=messages,
                 temperature=0.4,
-                max_tokens=2048,
+                max_tokens=1024, # Reduced from 2048 to stay under strict Groq output limits
             )
             answer = completion.choices[0].message.content
         except Exception as e:

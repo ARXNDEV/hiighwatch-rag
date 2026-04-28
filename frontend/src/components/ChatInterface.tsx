@@ -18,13 +18,14 @@ export function ChatInterface() {
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Load chat history on mount
     const fetchHistory = async () => {
       try {
-        const res = await axios.get(`${getApiBaseUrl()}/chat/history`);
+        const res = await axios.get(`${getApiBaseUrl()}/chat/history?t=${new Date().getTime()}`);
         if (res.data && res.data.history) {
           setMessages(res.data.history);
         }
@@ -103,12 +104,17 @@ export function ChatInterface() {
 
   const handleClearChat = async () => {
     if (loading || messages.length === 0) return;
-    if (!window.confirm("Are you sure you want to clear your entire chat history?")) return;
+    if (!confirmClear) {
+      setConfirmClear(true);
+      setTimeout(() => setConfirmClear(false), 3000);
+      return;
+    }
     
     try {
       setLoading(true);
       await axios.delete(`${getApiBaseUrl()}/chat`);
       setMessages([]);
+      setConfirmClear(false);
     } catch (err) {
       console.error("Failed to clear chat", err);
     } finally {
@@ -124,10 +130,14 @@ export function ChatInterface() {
           <button 
             onClick={handleClearChat}
             disabled={loading}
-            className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/20 rounded-lg text-xs font-medium text-white/50 hover:text-white/90 transition-all backdrop-blur-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all backdrop-blur-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+              confirmClear 
+                ? "bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30" 
+                : "bg-white/[0.03] text-white/50 border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/20 hover:text-white/90"
+            }`}
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Clear Chat</span>
+            <span>{confirmClear ? "Click again to confirm" : "Clear Chat"}</span>
           </button>
         </div>
       )}

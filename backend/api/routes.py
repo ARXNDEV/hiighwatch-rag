@@ -243,11 +243,14 @@ def clear_chat():
             service = get_drive_service()
             about = service.about().get(fields="user").execute()
             user_email = about['user']['emailAddress']
-        except Exception:
+        except Exception as e:
+            print(f"Error getting user email for clear chat: {e}")
             user_email = "default_user"
             
-        chats_collection.delete_many({"user_email": user_email})
-        return {"status": "success", "message": "Chat history cleared."}
+        result = chats_collection.delete_many({"user_email": user_email})
+        deleted_count = result.deleted_count if hasattr(result, 'deleted_count') else 0
+        print(f"Cleared {deleted_count} chat messages for user: {user_email}")
+        return {"status": "success", "message": f"Chat history cleared. Deleted {deleted_count} messages."}
     except Exception as e:
         import traceback
         traceback.print_exc()

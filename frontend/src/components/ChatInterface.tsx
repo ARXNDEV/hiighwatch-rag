@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot, User, Sparkles, FileText, Loader2, ArrowRight } from "lucide-react";
+import { Send, Bot, User, Sparkles, FileText, Loader2, ArrowRight, Trash2 } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import axios from "axios";
@@ -101,8 +101,37 @@ export function ChatInterface() {
     handleSubmit(undefined, summaryQuery);
   };
 
+  const handleClearChat = async () => {
+    if (loading || messages.length === 0) return;
+    if (!window.confirm("Are you sure you want to clear your entire chat history?")) return;
+    
+    try {
+      setLoading(true);
+      await axios.delete(`${getApiBaseUrl()}/chat`);
+      setMessages([]);
+    } catch (err) {
+      console.error("Failed to clear chat", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full w-full relative">
+      {/* Header Area with Clear Chat button */}
+      {messages.length > 0 && (
+        <div className="absolute top-4 right-6 z-20">
+          <button 
+            onClick={handleClearChat}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/20 rounded-lg text-xs font-medium text-white/50 hover:text-white/90 transition-all backdrop-blur-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Clear Chat</span>
+          </button>
+        </div>
+      )}
+
       {/* Messages Area */}
       <div 
         ref={scrollRef}

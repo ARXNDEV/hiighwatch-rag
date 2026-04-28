@@ -235,6 +235,24 @@ def auth_callback(state: str, code: str):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.delete("/chat")
+def clear_chat():
+    try:
+        from connectors.gdrive import get_drive_service
+        try:
+            service = get_drive_service()
+            about = service.about().get(fields="user").execute()
+            user_email = about['user']['emailAddress']
+        except Exception:
+            user_email = "default_user"
+            
+        chats_collection.delete_many({"user_email": user_email})
+        return {"status": "success", "message": "Chat history cleared."}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 class AskRequest(BaseModel):
     query: str
     filter_metadata: Optional[Dict[str, str]] = None  # Added for metadata filtering

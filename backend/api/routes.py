@@ -317,7 +317,7 @@ def background_sync_process(items, user_email):
         active_syncs.discard(user_email)
 
 @router.post("/sync-drive")
-def sync_drive_endpoint(force: Optional[bool] = False):
+def sync_drive_endpoint(force: Optional[bool] = False, folder_url: Optional[str] = None):
     try:
         import time
         start_time = time.time()
@@ -349,7 +349,7 @@ def sync_drive_endpoint(force: Optional[bool] = False):
                     if os.path.isfile(fp):
                         os.remove(fp)
                 
-        items, user_email = get_files_to_sync(page_size=20, force=bool(force))
+        items, user_email = get_files_to_sync(page_size=20, force=bool(force), folder_url=folder_url)
         if not items:
             return {"status": "success", "files_processed": 0, "message": "No new files to sync.", "files": []}
 

@@ -98,7 +98,9 @@ def download_file(service, file_id, file_name, mime_type, modified_time, synced_
         print(f"Failed to download {file_name}: {e}")
         return None
 
-def get_files_to_sync(page_size: int = 10, force: bool = False):
+import re
+
+def get_files_to_sync(page_size: int = 10, force: bool = False, folder_url: str = None):
     service = get_drive_service()
     if not os.path.exists(SYNC_DIR):
         os.makedirs(SYNC_DIR)
@@ -109,7 +111,17 @@ def get_files_to_sync(page_size: int = 10, force: bool = False):
     synced_files_cursor = files_collection.find({"user_email": user_email})
     synced_files = {f["file_id"]: f for f in synced_files_cursor}
 
-    query = "mimeType='application/pdf' or mimeType='application/vnd.google-apps.document' or mimeType='text/plain'"
+    # Extract folder ID if a URL is provided
+    folder_query = ""
+    if folder_url:
+        # Match typical Drive folder URLs like https://drive.google.com/drive/folders/1XYZ...
+        match = re.search(r"/folders/([a-zA-Z0-9_-]+)", folder_url)
+        if match:
+            folder_id = match.group(1)
+            folder_query = f"'{folder_id}' in parents and "
+
+    query = f"{folder_query}(mimeType='application/pdf' or mimeType='application/vnd.google-apps.document' or mimeType='text/plain')"
+    
     results = service.files().list(
         q=query,
         pageSize=page_size,

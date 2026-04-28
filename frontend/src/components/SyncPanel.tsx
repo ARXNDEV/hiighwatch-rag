@@ -9,6 +9,7 @@ import { getApiBaseUrl } from "@/utils/apiBaseUrl";
 
 export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: (docs: {id: string, name: string, status: string}[]) => void, autoSync?: boolean }) {
   const [syncing, setSyncing] = useState(false);
+  const [folderUrl, setFolderUrl] = useState("");
   const [status, setStatus] = useState<"idle" | "success" | "error" | "processing">("idle");
   const [message, setMessage] = useState("");
   const router = useRouter();
@@ -53,7 +54,11 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
     setStatus("idle");
     setMessage(force ? "Force syncing from Google Drive..." : "Syncing from Google Drive...");
     try {
-      const res = await axios.post(`${getApiBaseUrl()}/sync-drive${force ? "?force=true" : ""}`);
+      const urlParams = new URLSearchParams();
+      if (force) urlParams.append("force", "true");
+      if (folderUrl.trim()) urlParams.append("folder_url", folderUrl.trim());
+      
+      const res = await axios.post(`${getApiBaseUrl()}/sync-drive?${urlParams.toString()}`);
       setStatus("success");
       setMessage(res.data.message || `Successfully synced ${res.data.files_processed} files.`);
       
@@ -79,8 +84,17 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
   return (
     <div className="flex flex-col gap-3 relative">
       <p className="text-white/40 text-[0.75rem] leading-relaxed font-normal px-1 mb-2">
-        Connect your Google Drive to ingest PDFs, Docs, and TXT files.
+        Fetch PDFs and TXTs from your Drive. Leave blank for root, or paste a folder link below.
       </p>
+
+      <input
+        type="text"
+        placeholder="https://drive.google.com/drive/folders/..."
+        value={folderUrl}
+        onChange={(e) => setFolderUrl(e.target.value)}
+        disabled={syncing}
+        className="w-full bg-[#0A0A0A]/90 backdrop-blur-xl border border-white/10 text-white placeholder-white/30 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-white/20 focus:border-white/20 transition-all text-xs"
+      />
 
       <button
         onClick={() => handleSync(false)}

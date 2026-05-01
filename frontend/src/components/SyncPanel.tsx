@@ -16,7 +16,6 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
   const router = useRouter();
 
   useEffect(() => {
-    // Poll for storage stats to know when background processing is done
     let interval: NodeJS.Timeout;
     
     const checkStatus = async () => {
@@ -31,19 +30,28 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
           const done = typeof res.data.progress?.files_processed === "number" ? res.data.progress.files_processed : 0;
           const total = typeof res.data.progress?.total_files === "number" ? res.data.progress.total_files : 0;
           setMessage(`Indexing in background… Stage: ${stage}. Files: ${done}/${total}. Elapsed: ${elapsed}. ETA: ${eta}.`);
-        } else if (status === "processing" && res.data.status === "Ready") {
-          setStatus("success");
-          setMessage("Indexing complete! Documents are ready to be queried.");
+        } else if (res.data.status === "Error") {
+          setStatus("error");
+          const errText = res.data.progress?.error ? String(res.data.progress.error) : "Indexing failed.";
+          setMessage(errText);
+        } else if (res.data.status === "Ready") {
+          const indexed = typeof res.data.docs_indexed === "number" ? res.data.docs_indexed : 0;
+          const chunks = typeof res.data.total_chunks === "number" ? res.data.total_chunks : 0;
+          if (indexed === 0 || chunks === 0) {
+            setStatus("error");
+            setMessage("No indexed documents found on the server. Click Force Sync All Files, then wait until Docs Indexed and Total Chunks are > 0.");
+          } else if (status === "processing") {
+            setStatus("success");
+            setMessage("Indexing complete! Documents are ready to be queried.");
+          }
         }
       } catch (err) {
         // ignore polling errors
       }
     };
 
-    if (status === "processing" || status === "success") {
-       checkStatus();
-       interval = setInterval(checkStatus, 5000);
-    }
+    checkStatus();
+    interval = setInterval(checkStatus, 5000);
 
     return () => {
       if (interval) clearInterval(interval);

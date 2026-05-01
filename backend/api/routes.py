@@ -29,6 +29,11 @@ def list_documents():
             user_email = "default_user"
 
         docs = list(files_collection.find({"user_email": user_email}))
+        doc_ids = set()
+        for d in docs:
+            fid = d.get("file_id") or d.get("id")
+            if fid:
+                doc_ids.add(fid)
 
         chunks = load_chunks()
         indexed_doc_ids = set()
@@ -36,7 +41,8 @@ def list_documents():
             doc_id = c.get("doc_id")
             if doc_id:
                 base_doc_id = doc_id.split('_chunk_')[0] if '_chunk_' in doc_id else doc_id
-                indexed_doc_ids.add(base_doc_id)
+                if not doc_ids or base_doc_id in doc_ids:
+                    indexed_doc_ids.add(base_doc_id)
 
         result = []
         for d in docs:
@@ -47,7 +53,7 @@ def list_documents():
             result.append({
                 "id": fid,
                 "name": name,
-                "status": "Indexed" if fid in indexed_doc_ids else ("Indexing" if user_email in active_syncs else "Synced")
+                "status": "Indexed" if fid in indexed_doc_ids else ("Indexing" if user_email in active_syncs else "Not Indexed")
             })
 
         return {"documents": result}
@@ -145,8 +151,8 @@ def get_storage_stats():
         
         # Estimate FAISS file size
         faiss_size_bytes = 0
-        if os.path.exists("faiss_index.bin"):
-            faiss_size_bytes = os.path.getsize("faiss_index.bin")
+        if os.path.exists("synced_docs/faiss.index"):
+            faiss_size_bytes = os.path.getsize("synced_docs/faiss.index")
             
         # Get total size of synced files directory
         docs_size_bytes = 0
@@ -158,12 +164,30 @@ def get_storage_stats():
                     docs_size_bytes += os.path.getsize(fp)
                     docs_count += 1
 
-        docs_indexed = 0
+        docs_synced = 0
         if user_email:
             try:
-                docs_indexed = files_collection.count_documents({"user_email": user_email})
+                docs_synced = files_collection.count_documents({"user_email": user_email})
             except Exception:
-                docs_indexed = 0
+                docs_synced = 0
+
+        indexed_doc_ids = set()
+        if user_email and chunks:
+            try:
+                user_docs = list(files_collection.find({"user_email": user_email}))
+                user_doc_ids = set()
+                for d in user_docs:
+                    fid = d.get("file_id") or d.get("id")
+                    if fid:
+                        user_doc_ids.add(fid)
+                for c in chunks:
+                    doc_id = c.get("doc_id")
+                    if doc_id:
+                        base_doc_id = doc_id.split('_chunk_')[0] if '_chunk_' in doc_id else doc_id
+                        if base_doc_id in user_doc_ids:
+                            indexed_doc_ids.add(base_doc_id)
+            except Exception:
+                indexed_doc_ids = set()
 
         progress = None
         if user_email and user_email in sync_progress:
@@ -186,7 +210,8 @@ def get_storage_stats():
             "docs_size_kb": round(docs_size_bytes / 1024, 2),
             "docs_count": docs_count,
             "status": processing_status,
-            "docs_indexed": docs_indexed,
+            "docs_synced": docs_synced,
+            "docs_indexed": len(indexed_doc_ids),
             "total_chunks": len(chunks) if chunks else 0,
             "progress": progress,
             "elapsed_seconds": elapsed_seconds,
@@ -201,6 +226,7 @@ def get_storage_stats():
             "docs_size_kb": 0,
             "docs_count": 0,
             "status": "Error",
+            "docs_synced": 0,
             "docs_indexed": 0,
             "total_chunks": 0,
             "progress": None,

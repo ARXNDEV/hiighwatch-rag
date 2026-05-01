@@ -167,6 +167,7 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
       {stats && (
         <div className="mt-2 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/60 text-[11px] space-y-1">
           <div className="flex justify-between"><span>Status</span><span className="text-white/80">{stats.status || "—"}</span></div>
+          <div className="flex justify-between"><span>Docs Synced</span><span className="text-white/80">{typeof stats.docs_synced === "number" ? stats.docs_synced : "—"}</span></div>
           <div className="flex justify-between"><span>Docs Indexed</span><span className="text-white/80">{typeof stats.docs_indexed === "number" ? stats.docs_indexed : "—"}</span></div>
           <div className="flex justify-between"><span>Total Chunks</span><span className="text-white/80">{typeof stats.total_chunks === "number" ? stats.total_chunks : "—"}</span></div>
           <div className="flex justify-between"><span>Vectors</span><span className="text-white/80">{typeof stats.vectors === "number" ? stats.vectors : "—"}</span></div>

@@ -80,10 +80,11 @@ def auth_login():
 @router.get("/storage/stats")
 def get_storage_stats():
     try:
-        from search.vector_store import index, load_chunks
+        from search.vector_store import load_faiss_index, load_chunks
         from db import files_collection
         import os
         from connectors.gdrive import get_drive_service
+        import time
         
         user_email = None
         try:
@@ -93,13 +94,9 @@ def get_storage_stats():
         except Exception:
             pass
         
-        # Get FAISS vector count
+        index = load_faiss_index()
         vector_count = index.ntotal if index else 0
-        
-        # See how many files are tracked in the database
-        db_files_count = files_collection.count_documents({})
-        
-        # Check if chunks are loaded indicating files are processed
+
         chunks = load_chunks()
         
         # Check if this user currently has an active background sync running
@@ -121,13 +118,40 @@ def get_storage_stats():
                 if os.path.isfile(fp):
                     docs_size_bytes += os.path.getsize(fp)
                     docs_count += 1
+
+        docs_indexed = 0
+        if user_email:
+            try:
+                docs_indexed = files_collection.count_documents({"user_email": user_email})
+            except Exception:
+                docs_indexed = 0
+
+        progress = None
+        if user_email and user_email in sync_progress:
+            progress = sync_progress.get(user_email)
+
+        elapsed_seconds = None
+        eta_seconds = None
+        if progress and progress.get("started_at"):
+            elapsed_seconds = round(time.time() - progress["started_at"], 2)
+            total_files = progress.get("total_files") or 0
+            files_processed = progress.get("files_processed") or 0
+            if total_files > 0 and files_processed > 0:
+                rate = elapsed_seconds / files_processed
+                remaining = max(total_files - files_processed, 0)
+                eta_seconds = round(rate * remaining, 2)
                         
         return {
             "vectors": vector_count,
             "faiss_size_kb": round(faiss_size_bytes / 1024, 2),
             "docs_size_kb": round(docs_size_bytes / 1024, 2),
             "docs_count": docs_count,
-            "status": processing_status
+            "status": processing_status,
+            "docs_indexed": docs_indexed,
+            "total_chunks": len(chunks) if chunks else 0,
+            "progress": progress,
+            "elapsed_seconds": elapsed_seconds,
+            "eta_seconds": eta_seconds
         }
     except Exception as e:
         import traceback
@@ -137,7 +161,12 @@ def get_storage_stats():
             "faiss_size_kb": 0,
             "docs_size_kb": 0,
             "docs_count": 0,
-            "status": "Error"
+            "status": "Error",
+            "docs_indexed": 0,
+            "total_chunks": 0,
+            "progress": None,
+            "elapsed_seconds": None,
+            "eta_seconds": None
         }
 @router.get("/chat/history")
 def get_chat_history():
@@ -303,6 +332,7 @@ def disconnect_drive_endpoint():
 
 # Keep track of active background syncs
 active_syncs = set()
+sync_progress = {}
 
 def background_sync_process(items, user_email):
     try:
@@ -310,8 +340,19 @@ def background_sync_process(items, user_email):
         import time
         import gc
         start_time = time.time()
+        sync_progress[user_email] = {
+            "started_at": start_time,
+            "updated_at": start_time,
+            "stage": "downloading",
+            "total_files": len(items) if items else 0,
+            "files_downloaded": 0,
+            "files_processed": 0,
+            "chunks_indexed": 0
+        }
 
         downloaded_files = download_items(items, user_email)
+        sync_progress[user_email]["files_downloaded"] = len(downloaded_files)
+        sync_progress[user_email]["updated_at"] = time.time()
         if not downloaded_files:
             print("Background: No new files downloaded.")
             return
@@ -322,6 +363,8 @@ def background_sync_process(items, user_email):
             batch_chunks_target = 96
         batch_chunks_target = max(16, min(batch_chunks_target, 256))
 
+        sync_progress[user_email]["stage"] = "processing"
+        sync_progress[user_email]["updated_at"] = time.time()
         index = load_faiss_index()
 
         pending_chunks = []
@@ -329,23 +372,39 @@ def background_sync_process(items, user_email):
             file_chunks = process_single_file(f)
             if file_chunks:
                 pending_chunks.extend(file_chunks)
+            sync_progress[user_email]["files_processed"] = sync_progress[user_email].get("files_processed", 0) + 1
+            sync_progress[user_email]["updated_at"] = time.time()
             gc.collect()
 
             if len(pending_chunks) >= batch_chunks_target:
+                sync_progress[user_email]["stage"] = "embedding"
+                sync_progress[user_email]["updated_at"] = time.time()
                 embedded_chunks = embed_chunks(pending_chunks)
+                sync_progress[user_email]["stage"] = "indexing"
                 add_chunks_to_index(index, embedded_chunks)
+                sync_progress[user_email]["chunks_indexed"] = sync_progress[user_email].get("chunks_indexed", 0) + len(embedded_chunks)
+                sync_progress[user_email]["updated_at"] = time.time()
                 pending_chunks = []
                 gc.collect()
 
         if pending_chunks:
+            sync_progress[user_email]["stage"] = "embedding"
+            sync_progress[user_email]["updated_at"] = time.time()
             embedded_chunks = embed_chunks(pending_chunks)
+            sync_progress[user_email]["stage"] = "indexing"
             add_chunks_to_index(index, embedded_chunks)
+            sync_progress[user_email]["chunks_indexed"] = sync_progress[user_email].get("chunks_indexed", 0) + len(embedded_chunks)
+            sync_progress[user_email]["updated_at"] = time.time()
             pending_chunks = []
             gc.collect()
 
+        sync_progress[user_email]["stage"] = "saving"
+        sync_progress[user_email]["updated_at"] = time.time()
         save_faiss_index(index)
 
         end_time = time.time()
+        sync_progress[user_email]["stage"] = "done"
+        sync_progress[user_email]["updated_at"] = end_time
         print(f"Background: Sync completed in {round(end_time - start_time, 2)} seconds")
     except Exception as e:
         import traceback
@@ -396,6 +455,15 @@ def sync_drive_endpoint(background_tasks: BackgroundTasks, force: Optional[bool]
         end_time = time.time()
         print(f"Sync request accepted in {round(end_time - start_time, 2)} seconds.")
 
+        sync_progress[user_email] = {
+            "started_at": time.time(),
+            "updated_at": time.time(),
+            "stage": "queued",
+            "total_files": len(items),
+            "files_downloaded": 0,
+            "files_processed": 0,
+            "chunks_indexed": 0
+        }
         background_tasks.add_task(background_sync_process, items, user_email)
 
         return {

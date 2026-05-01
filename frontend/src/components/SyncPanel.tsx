@@ -12,6 +12,7 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
   const [folderUrl, setFolderUrl] = useState("");
   const [status, setStatus] = useState<"idle" | "success" | "error" | "processing">("idle");
   const [message, setMessage] = useState("");
+  const [stats, setStats] = useState<any>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -21,9 +22,15 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
     const checkStatus = async () => {
       try {
         const res = await axios.get(`${getApiBaseUrl()}/storage/stats`);
+        setStats(res.data);
         if (res.data.status === "Processing in background...") {
           setStatus("processing");
-          setMessage("AI is extracting text and indexing documents...");
+          const elapsed = typeof res.data.elapsed_seconds === "number" ? `${Math.round(res.data.elapsed_seconds)}s` : "—";
+          const eta = typeof res.data.eta_seconds === "number" ? `${Math.round(res.data.eta_seconds)}s` : "—";
+          const stage = res.data.progress?.stage ? String(res.data.progress.stage) : "processing";
+          const done = typeof res.data.progress?.files_processed === "number" ? res.data.progress.files_processed : 0;
+          const total = typeof res.data.progress?.total_files === "number" ? res.data.progress.total_files : 0;
+          setMessage(`Indexing in background… Stage: ${stage}. Files: ${done}/${total}. Elapsed: ${elapsed}. ETA: ${eta}.`);
         } else if (status === "processing" && res.data.status === "Ready") {
           setStatus("success");
           setMessage("Indexing complete! Documents are ready to be queried.");
@@ -59,7 +66,11 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
       if (folderUrl.trim()) urlParams.append("folder_url", folderUrl.trim());
       
       const res = await axios.post(`${getApiBaseUrl()}/sync-drive?${urlParams.toString()}`);
-      setStatus("success");
+      if (typeof res.data?.message === "string" && res.data.message.toLowerCase().includes("sync started")) {
+        setStatus("processing");
+      } else {
+        setStatus("success");
+      }
       setMessage(res.data.message || `Successfully synced ${res.data.files_processed} files.`);
       
       if (res.data.files && res.data.files.length > 0) {
@@ -151,6 +162,17 @@ export function SyncPanel({ onSyncSuccess, autoSync = false }: { onSyncSuccess: 
            <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
           <span className="leading-relaxed">{message}</span>
         </motion.div>
+      )}
+
+      {stats && (
+        <div className="mt-2 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/60 text-[11px] space-y-1">
+          <div className="flex justify-between"><span>Status</span><span className="text-white/80">{stats.status || "—"}</span></div>
+          <div className="flex justify-between"><span>Docs Indexed</span><span className="text-white/80">{typeof stats.docs_indexed === "number" ? stats.docs_indexed : "—"}</span></div>
+          <div className="flex justify-between"><span>Total Chunks</span><span className="text-white/80">{typeof stats.total_chunks === "number" ? stats.total_chunks : "—"}</span></div>
+          <div className="flex justify-between"><span>Vectors</span><span className="text-white/80">{typeof stats.vectors === "number" ? stats.vectors : "—"}</span></div>
+          <div className="flex justify-between"><span>Elapsed</span><span className="text-white/80">{typeof stats.elapsed_seconds === "number" ? `${Math.round(stats.elapsed_seconds)}s` : "—"}</span></div>
+          <div className="flex justify-between"><span>ETA</span><span className="text-white/80">{typeof stats.eta_seconds === "number" ? `${Math.round(stats.eta_seconds)}s` : "—"}</span></div>
+        </div>
       )}
     </div>
   );

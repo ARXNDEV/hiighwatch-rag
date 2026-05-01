@@ -69,6 +69,9 @@ def _process_single_file(file):
         
     return local_chunks
 
+def process_single_file(file):
+    return _process_single_file(file)
+
 def process_files(files):
     import gc
     all_chunks = []

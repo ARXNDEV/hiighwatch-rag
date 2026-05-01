@@ -147,21 +147,43 @@ def download_items(items, user_email):
     if not items:
         return []
 
-    service = get_drive_service()
     from db import files_collection
     synced_files_cursor = files_collection.find({"user_email": user_email})
     synced_files = {f["file_id"]: f for f in synced_files_cursor}
 
-    downloaded = []
-    for item in items:
+    try:
+        max_workers = int(os.getenv("DOWNLOAD_WORKERS", "2"))
+    except Exception:
+        max_workers = 2
+    max_workers = max(1, min(max_workers, 3))
+
+    def _download_one(item):
+        service = get_drive_service()
         file_id = item['id']
         file_name = item['name']
         mime_type = item['mimeType']
         modified_time = item['modifiedTime']
         print(f"Downloading {file_name}...")
-        result = download_file(service, file_id, file_name, mime_type, modified_time, synced_files, user_email)
-        if result:
-            downloaded.append(result)
+        return download_file(service, file_id, file_name, mime_type, modified_time, synced_files, user_email)
+
+    downloaded = []
+    if max_workers == 1 or len(items) == 1:
+        for item in items:
+            result = _download_one(item)
+            if result:
+                downloaded.append(result)
+        return downloaded
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(_download_one, item) for item in items]
+        for future in as_completed(futures):
+            try:
+                result = future.result()
+                if result:
+                    downloaded.append(result)
+            except Exception as e:
+                print(f"Failed to download item: {e}")
 
     return downloaded
 

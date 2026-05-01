@@ -19,9 +19,13 @@ def embed_chunks(chunks):
         
     texts = [chunk['text'] for chunk in chunks]
     
-    # Unlimited memory: Increase batch size to 64 for maximum throughput
-    # normalize_embeddings=True makes the FAISS L2 distance mathematically equivalent to Cosine Similarity
-    embeddings = model.encode(texts, batch_size=4, show_progress_bar=False, normalize_embeddings=True)
+    try:
+        batch_size = int(os.getenv("EMBED_BATCH_SIZE", "8"))
+    except Exception:
+        batch_size = 8
+    batch_size = max(1, min(batch_size, 32))
+
+    embeddings = model.encode(texts, batch_size=batch_size, show_progress_bar=False, normalize_embeddings=True)
     
     try:
         import gc

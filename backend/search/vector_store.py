@@ -5,49 +5,127 @@ import os
 from db import files_collection
 
 INDEX_FILE = "synced_docs/faiss.index"
-CHUNKS_FILE = "synced_docs/chunks.json"
+CHUNKS_JSONL_FILE = "synced_docs/chunks.jsonl"
+CHUNKS_JSON_FILE = "synced_docs/chunks.json"
 DIMENSION = 384 # Dimension for 'all-MiniLM-L6-v2'
 
+_index_cache = None
+_index_mtime = None
+_chunks_cache = None
+_chunks_mtime = None
+_chunks_path = None
+
 def load_faiss_index():
+    global _index_cache, _index_mtime
     if os.path.exists(INDEX_FILE):
-        return faiss.read_index(INDEX_FILE)
+        mtime = os.path.getmtime(INDEX_FILE)
+        if _index_cache is not None and _index_mtime == mtime:
+            return _index_cache
+        _index_cache = faiss.read_index(INDEX_FILE)
+        _index_mtime = mtime
+        return _index_cache
     # Using IndexFlatIP for Cosine Similarity (requires normalized embeddings)
-    return faiss.IndexFlatIP(DIMENSION)
+    _index_cache = faiss.IndexFlatIP(DIMENSION)
+    _index_mtime = None
+    return _index_cache
 
 def load_chunks():
-    if os.path.exists(CHUNKS_FILE):
-        with open(CHUNKS_FILE, "r") as f:
-            return json.load(f)
-    return []
+    global _chunks_cache, _chunks_mtime, _chunks_path
+    path = None
+    if os.path.exists(CHUNKS_JSONL_FILE):
+        path = CHUNKS_JSONL_FILE
+    elif os.path.exists(CHUNKS_JSON_FILE):
+        path = CHUNKS_JSON_FILE
+
+    if not path:
+        _chunks_cache = []
+        _chunks_mtime = None
+        _chunks_path = None
+        return []
+
+    mtime = os.path.getmtime(path)
+    if _chunks_cache is not None and _chunks_mtime == mtime and _chunks_path == path:
+        return _chunks_cache
+
+    if path.endswith(".jsonl"):
+        chunks = []
+        with open(path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                chunks.append(json.loads(line))
+        _chunks_cache = chunks
+    else:
+        with open(path, "r") as f:
+            _chunks_cache = json.load(f)
+
+    _chunks_mtime = mtime
+    _chunks_path = path
+    return _chunks_cache
 
 def save_faiss_index(index):
+    global _index_cache, _index_mtime
     if not os.path.exists("synced_docs"):
         os.makedirs("synced_docs")
     faiss.write_index(index, INDEX_FILE)
+    _index_cache = index
+    try:
+        _index_mtime = os.path.getmtime(INDEX_FILE)
+    except Exception:
+        _index_mtime = None
 
 def save_chunks(chunks):
+    global _chunks_cache, _chunks_mtime, _chunks_path
     if not os.path.exists("synced_docs"):
         os.makedirs("synced_docs")
-    with open(CHUNKS_FILE, "w") as f:
-        json.dump(chunks, f)
+    with open(CHUNKS_JSONL_FILE, "w") as f:
+        for chunk in chunks:
+            f.write(json.dumps(chunk) + "\n")
+    _chunks_cache = chunks
+    _chunks_path = CHUNKS_JSONL_FILE
+    try:
+        _chunks_mtime = os.path.getmtime(CHUNKS_JSONL_FILE)
+    except Exception:
+        _chunks_mtime = None
 
-def add_to_faiss(new_chunks):
-    index = load_faiss_index()
-    existing_chunks = load_chunks()
+def append_chunks(chunks):
+    global _chunks_cache, _chunks_mtime, _chunks_path
+    if not chunks:
+        return
+    if not os.path.exists("synced_docs"):
+        os.makedirs("synced_docs")
+    if _chunks_cache is None or _chunks_path != CHUNKS_JSONL_FILE:
+        _chunks_cache = []
+        _chunks_mtime = None
+        _chunks_path = CHUNKS_JSONL_FILE
+    with open(CHUNKS_JSONL_FILE, "a") as f:
+        for chunk in chunks:
+            f.write(json.dumps(chunk) + "\n")
+    _chunks_cache.extend(chunks)
+    _chunks_path = CHUNKS_JSONL_FILE
+    try:
+        _chunks_mtime = os.path.getmtime(CHUNKS_JSONL_FILE)
+    except Exception:
+        _chunks_mtime = None
 
+def add_chunks_to_index(index, new_chunks):
+    if not new_chunks:
+        return
     embeddings = np.array([chunk['embedding'] for chunk in new_chunks]).astype('float32')
     if len(embeddings) > 0:
         index.add(embeddings)
 
-    # Strip embeddings before saving to JSON to save space
     for chunk in new_chunks:
         if 'embedding' in chunk:
             del chunk['embedding']
 
-    existing_chunks.extend(new_chunks)
+    append_chunks(new_chunks)
 
+def add_to_faiss(new_chunks):
+    index = load_faiss_index()
+    add_chunks_to_index(index, new_chunks)
     save_faiss_index(index)
-    save_chunks(existing_chunks)
 
 def search_faiss(query, k=5, filters=None):
     from embedding.embedder import model

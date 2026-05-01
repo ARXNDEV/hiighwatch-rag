@@ -4,9 +4,9 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from connectors.gdrive import get_files_to_sync, download_items, SCOPES, TOKEN_FILE
 from google_auth_oauthlib.flow import Flow
-from processing.parser import process_files
+from processing.parser import process_single_file
 from embedding.embedder import embed_chunks
-from search.vector_store import add_to_faiss, search_faiss, get_document_metadata
+from search.vector_store import add_to_faiss, search_faiss, get_document_metadata, load_faiss_index, save_faiss_index, add_chunks_to_index
 from groq import Groq
 import os
 import hashlib
@@ -308,6 +308,7 @@ def background_sync_process(items, user_email):
     try:
         active_syncs.add(user_email)
         import time
+        import gc
         start_time = time.time()
 
         downloaded_files = download_items(items, user_email)
@@ -315,18 +316,34 @@ def background_sync_process(items, user_email):
             print("Background: No new files downloaded.")
             return
 
-        print(f"Background: Extracting text from {len(downloaded_files)} files...")
-        chunks = process_files(downloaded_files)
-        
-        if not chunks:
-            print("Background: Files downloaded but no text extracted.")
-            return
+        try:
+            batch_chunks_target = int(os.getenv("EMBED_CHUNK_BATCH", "96"))
+        except Exception:
+            batch_chunks_target = 96
+        batch_chunks_target = max(16, min(batch_chunks_target, 256))
 
-        print(f"Background: Embedding {len(chunks)} chunks...")
-        embedded_chunks = embed_chunks(chunks)
+        index = load_faiss_index()
 
-        print("Background: Adding chunks to FAISS...")
-        add_to_faiss(embedded_chunks)
+        pending_chunks = []
+        for f in downloaded_files:
+            file_chunks = process_single_file(f)
+            if file_chunks:
+                pending_chunks.extend(file_chunks)
+            gc.collect()
+
+            if len(pending_chunks) >= batch_chunks_target:
+                embedded_chunks = embed_chunks(pending_chunks)
+                add_chunks_to_index(index, embedded_chunks)
+                pending_chunks = []
+                gc.collect()
+
+        if pending_chunks:
+            embedded_chunks = embed_chunks(pending_chunks)
+            add_chunks_to_index(index, embedded_chunks)
+            pending_chunks = []
+            gc.collect()
+
+        save_faiss_index(index)
 
         end_time = time.time()
         print(f"Background: Sync completed in {round(end_time - start_time, 2)} seconds")
@@ -338,7 +355,7 @@ def background_sync_process(items, user_email):
         active_syncs.discard(user_email)
 
 @router.post("/sync-drive")
-def sync_drive_endpoint(force: Optional[bool] = False, folder_url: Optional[str] = None):
+def sync_drive_endpoint(background_tasks: BackgroundTasks, force: Optional[bool] = False, folder_url: Optional[str] = None):
     try:
         import time
         start_time = time.time()
@@ -361,6 +378,8 @@ def sync_drive_endpoint(force: Optional[bool] = False, folder_url: Optional[str]
                 os.remove("synced_docs/faiss.index")
             if os.path.exists("synced_docs/chunks.json"):
                 os.remove("synced_docs/chunks.json")
+            if os.path.exists("synced_docs/chunks.jsonl"):
+                os.remove("synced_docs/chunks.jsonl")
                 
             # Clear local files
             sync_dir = "synced_docs"
@@ -374,33 +393,15 @@ def sync_drive_endpoint(force: Optional[bool] = False, folder_url: Optional[str]
         if not items:
             return {"status": "success", "files_processed": 0, "message": "No new files to sync.", "files": []}
 
-        import gc
-        
-        # Process files synchronously instead of in the background
-        downloaded_files = download_items(items, user_email)
-        gc.collect()
-        
-        if downloaded_files:
-            print(f"Extracting text from {len(downloaded_files)} files...")
-            chunks = process_files(downloaded_files)
-            gc.collect()
-            
-            if chunks:
-                print(f"Embedding {len(chunks)} chunks...")
-                embedded_chunks = embed_chunks(chunks)
-                gc.collect()
-                
-                print("Adding chunks to FAISS...")
-                add_to_faiss(embedded_chunks)
-                gc.collect()
-
         end_time = time.time()
-        print(f"Sync and indexing completed in {round(end_time - start_time, 2)} seconds.")
+        print(f"Sync request accepted in {round(end_time - start_time, 2)} seconds.")
+
+        background_tasks.add_task(background_sync_process, items, user_email)
 
         return {
             "status": "success",
             "files_processed": len(items),
-            "message": f"Successfully synced and indexed {len(downloaded_files)} files. AI is ready.",
+            "message": f"Sync started for {len(items)} files. Indexing is running in the background.",
             "files": [{"id": f["id"], "name": f["name"]} for f in items]
         }
     except Exception as e:

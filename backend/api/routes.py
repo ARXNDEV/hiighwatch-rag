@@ -143,11 +143,15 @@ def get_storage_stats():
         vector_count = index.ntotal if index else 0
 
         chunks = load_chunks()
-        
-        # Check if this user currently has an active background sync running
-        is_processing = (user_email in active_syncs) if user_email else False
-        
-        processing_status = "Processing in background..." if is_processing else "Ready"
+        progress = sync_progress.get(user_email) if user_email else None
+        stage = progress.get("stage") if progress else None
+        is_processing = bool(user_email and ((user_email in active_syncs) or (stage and stage not in ("done", "error"))))
+        is_error = bool(stage == "error")
+
+        if is_error:
+            processing_status = "Error"
+        else:
+            processing_status = "Processing in background..." if is_processing else "Ready"
         
         # Estimate FAISS file size
         faiss_size_bytes = 0
@@ -188,10 +192,6 @@ def get_storage_stats():
                             indexed_doc_ids.add(base_doc_id)
             except Exception:
                 indexed_doc_ids = set()
-
-        progress = None
-        if user_email and user_email in sync_progress:
-            progress = sync_progress.get(user_email)
 
         elapsed_seconds = None
         eta_seconds = None
@@ -412,7 +412,8 @@ def background_sync_process(items, user_email):
             "total_files": len(items) if items else 0,
             "files_downloaded": 0,
             "files_processed": 0,
-            "chunks_indexed": 0
+            "chunks_indexed": 0,
+            "error": None
         }
 
         downloaded_files = download_items(items, user_email)
@@ -420,6 +421,8 @@ def background_sync_process(items, user_email):
         sync_progress[user_email]["updated_at"] = time.time()
         if not downloaded_files:
             print("Background: No new files downloaded.")
+            sync_progress[user_email]["stage"] = "done"
+            sync_progress[user_email]["updated_at"] = time.time()
             return
 
         try:
@@ -475,6 +478,14 @@ def background_sync_process(items, user_email):
         import traceback
         print("Background Sync Error:")
         traceback.print_exc()
+        try:
+            import time
+            if user_email in sync_progress:
+                sync_progress[user_email]["stage"] = "error"
+                sync_progress[user_email]["error"] = str(e)
+                sync_progress[user_email]["updated_at"] = time.time()
+        except Exception:
+            pass
     finally:
         active_syncs.discard(user_email)
 
@@ -559,7 +570,8 @@ def ask_endpoint(req: AskRequest):
         except Exception:
             user_email = "default_user"
 
-        if user_email in active_syncs:
+        progress = sync_progress.get(user_email) if user_email else None
+        if (user_email in active_syncs) or (progress and progress.get("stage") not in (None, "done", "error")):
             return AskResponse(
                 answer="Your documents are still syncing and being indexed. Please wait for Index Stats to show Ready, then try again.",
                 sources=[],

@@ -136,6 +136,17 @@ def search_faiss(query, k=5, filters=None):
         return []
 
     if filters and isinstance(filters, dict) and filters.get("doc_id"):
+        wanted = filters["doc_id"]
+        results = []
+        for chunk in chunks:
+            base_doc_id = chunk["doc_id"].split('_chunk_')[0] if '_chunk_' in chunk["doc_id"] else chunk["doc_id"]
+            if base_doc_id == wanted:
+                results.append(chunk)
+                if len(results) >= k:
+                    break
+        return results
+
+    if filters and isinstance(filters, dict) and filters.get("doc_id"):
         search_k = min(index.ntotal, max(k * 100, 1000))
     elif filters:
         search_k = min(index.ntotal, max(k * 25, 250))

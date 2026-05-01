@@ -160,7 +160,12 @@ def search_faiss(query, k=5, filters=None):
                     if metadata:
                         match = True
                         for key, val in filters.items():
-                            if metadata.get(key) != val:
+                            if key == "name":
+                                m = metadata.get(key)
+                                if (m or "").strip().lower() != (val or "").strip().lower():
+                                    match = False
+                                    break
+                            elif metadata.get(key) != val:
                                 match = False
                                 break
                         if not match:

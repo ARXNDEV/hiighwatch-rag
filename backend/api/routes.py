@@ -426,6 +426,13 @@ def ask_endpoint(req: AskRequest):
         except Exception:
             user_email = "default_user"
 
+        if user_email in active_syncs:
+            return AskResponse(
+                answer="Your documents are still syncing and being indexed. Please wait for Index Stats to show Ready, then try again.",
+                sources=[],
+                cached=False
+            )
+
         # Save user query to MongoDB
         chats_collection.insert_one({
             "user_email": user_email,
@@ -446,6 +453,20 @@ def ask_endpoint(req: AskRequest):
             doc_name = req.query.replace("Please provide a comprehensive summary of the document: ", "").strip()
             if not filter_metadata:
                 doc = files_collection.find_one({"user_email": user_email, "name": doc_name})
+                if not doc:
+                    try:
+                        import re
+                        doc = files_collection.find_one({"user_email": user_email, "name": {"$regex": f"^{re.escape(doc_name)}$", "$options": "i"}})
+                    except Exception:
+                        doc = None
+
+                if not doc:
+                    try:
+                        import re
+                        doc = files_collection.find_one({"user_email": user_email, "name": {"$regex": re.escape(doc_name), "$options": "i"}})
+                    except Exception:
+                        doc = None
+
                 if doc and doc.get("file_id"):
                     filter_metadata = {"doc_id": doc["file_id"]}
                 else:
@@ -453,7 +474,7 @@ def ask_endpoint(req: AskRequest):
 
             faiss_query = f"Overview and summary of {doc_name}"
                 
-        top_k = 15 if is_summary_request else 8
+        top_k = 12 if is_summary_request else 8
 
         top_chunks = search_faiss(faiss_query, k=top_k, filters=filter_metadata)
         
@@ -526,7 +547,7 @@ Question:
         client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
         model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-        max_tokens = 1536 if is_summary_request else 768
+        max_tokens = 1024 if is_summary_request else 768
 
         try:
             completion = client.chat.completions.create(

@@ -6,7 +6,7 @@ from connectors.gdrive import get_files_to_sync, download_items, SCOPES, TOKEN_F
 from google_auth_oauthlib.flow import Flow
 from processing.parser import process_single_file
 from embedding.embedder import embed_chunks
-from search.vector_store import add_to_faiss, search_faiss, get_document_metadata, load_faiss_index, save_faiss_index, add_chunks_to_index
+from search.vector_store import add_to_faiss, search_faiss, get_document_metadata, load_faiss_index, save_faiss_index, add_chunks_to_index, load_chunks
 from groq import Groq
 import os
 import hashlib
@@ -16,6 +16,45 @@ router = APIRouter()
 # Simple in-memory cache for LLM responses
 llm_cache = {}
 oauth_states = {}
+
+@router.get("/documents")
+def list_documents():
+    try:
+        from connectors.gdrive import get_drive_service
+        try:
+            service = get_drive_service()
+            about = service.about().get(fields="user").execute()
+            user_email = about['user']['emailAddress']
+        except Exception:
+            user_email = "default_user"
+
+        docs = list(files_collection.find({"user_email": user_email}))
+
+        chunks = load_chunks()
+        indexed_doc_ids = set()
+        for c in chunks:
+            doc_id = c.get("doc_id")
+            if doc_id:
+                base_doc_id = doc_id.split('_chunk_')[0] if '_chunk_' in doc_id else doc_id
+                indexed_doc_ids.add(base_doc_id)
+
+        result = []
+        for d in docs:
+            fid = d.get("file_id") or d.get("id")
+            name = d.get("name")
+            if not fid or not name:
+                continue
+            result.append({
+                "id": fid,
+                "name": name,
+                "status": "Indexed" if fid in indexed_doc_ids else ("Indexing" if user_email in active_syncs else "Synced")
+            })
+
+        return {"documents": result}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"documents": []}
 
 @router.get("/auth/status")
 def auth_status():
@@ -547,6 +586,18 @@ def ask_endpoint(req: AskRequest):
         top_chunks = search_faiss(faiss_query, k=top_k, filters=filter_metadata)
         
         if not top_chunks:
+            if is_summary_request:
+                try:
+                    doc_name = req.query.replace("Please provide a comprehensive summary of the document: ", "").strip()
+                    doc = files_collection.find_one({"user_email": user_email, "name": doc_name})
+                    if doc:
+                        return AskResponse(
+                            answer="That document is synced but not indexed yet. Please wait for Index Stats to show Ready (and the document status to show Indexed), then try again.",
+                            sources=[],
+                            cached=False
+                        )
+                except Exception:
+                    pass
             return AskResponse(
                 answer="I couldn't find any relevant information in your synced documents.",
                 sources=[],

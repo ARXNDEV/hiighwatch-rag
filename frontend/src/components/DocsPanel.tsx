@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { FileText, CheckCircle, Database } from "lucide-react";
 
-export function DocsPanel({ docs, onDocumentClick }: { docs: { id: string, name: string, status: string }[], onDocumentClick?: (name: string) => void }) {
+export function DocsPanel({ docs, onDocumentClick }: { docs: { id: string, name: string, status: string }[], onDocumentClick?: (doc: { id: string, name: string }) => void }) {
   return (
     <div className="flex-1 overflow-y-auto pr-1 -mr-1 space-y-1.5 custom-scrollbar">
       {docs.length === 0 ? (
@@ -18,7 +18,7 @@ export function DocsPanel({ docs, onDocumentClick }: { docs: { id: string, name:
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.03 }}
-            onClick={() => onDocumentClick && onDocumentClick(doc.name)}
+            onClick={() => onDocumentClick && onDocumentClick({ id: doc.id, name: doc.name })}
             className="p-2.5 rounded-lg flex items-center gap-3 group/item hover:bg-white/[0.08] transition-colors cursor-pointer active:scale-[0.98]"
             title="Click to ask AI to summarize this document"
           >

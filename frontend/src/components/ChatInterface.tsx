@@ -44,9 +44,9 @@ export function ChatInterface() {
 
   useEffect(() => {
     const handleDocumentSummaryRequest = (e: Event) => {
-      const customEvent = e as CustomEvent<{ docName: string }>;
+      const customEvent = e as CustomEvent<{ docId?: string; docName: string }>;
       if (customEvent.detail && customEvent.detail.docName) {
-        handleSourceClick(customEvent.detail.docName);
+        handleSourceClick(customEvent.detail.docName, customEvent.detail.docId);
       }
     };
 
@@ -56,7 +56,7 @@ export function ChatInterface() {
     };
   }, [loading]);
 
-  const handleSubmit = async (e?: React.FormEvent, overrideQuery?: string) => {
+  const handleSubmit = async (e?: React.FormEvent, overrideQuery?: string, filterMetadata?: any) => {
     if (e) e.preventDefault();
     const userQuery = (overrideQuery || query).trim();
     if (!userQuery) return;
@@ -66,7 +66,7 @@ export function ChatInterface() {
     setLoading(true);
 
     try {
-      const res = await axios.post(`${getApiBaseUrl()}/ask`, { query: userQuery });
+      const res = await axios.post(`${getApiBaseUrl()}/ask`, { query: userQuery, filter_metadata: filterMetadata || undefined });
       setMessages((prev) => [
         ...prev,
         {
@@ -80,7 +80,7 @@ export function ChatInterface() {
       
       // Handle rate limits or other specific errors from the backend
       if (err.response?.data?.detail) {
-        if (typeof err.response.data.detail === 'string' && err.response.data.detail.includes('Rate limit reached')) {
+        if (typeof err.response.data.detail === 'string' && err.response.data.detail.toLowerCase().includes('rate limit')) {
           errorMsg = "The AI rate limit has been reached for today. Please wait a while or upgrade your API key to continue chatting.";
         } else {
           errorMsg = `Error: ${err.response.data.detail}`;
@@ -96,10 +96,11 @@ export function ChatInterface() {
     }
   };
 
-  const handleSourceClick = (docName: string) => {
+  const handleSourceClick = (docName: string, docId?: string) => {
     if (loading) return;
     const summaryQuery = `Please provide a comprehensive summary of the document: ${docName}`;
-    handleSubmit(undefined, summaryQuery);
+    const filterMetadata = docId ? { doc_id: docId } : undefined;
+    handleSubmit(undefined, summaryQuery, filterMetadata);
   };
 
   const handleClearChat = async () => {
@@ -188,7 +189,7 @@ export function ChatInterface() {
                     {msg.sources.map((src, i) => (
                       <div 
                         key={i} 
-                        onClick={() => handleSourceClick(src.name)}
+                        onClick={() => handleSourceClick(src.name, src.doc_id)}
                         className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] text-white/50 hover:text-white/90 hover:bg-white/[0.08] hover:border-white/20 transition-all cursor-pointer group/src backdrop-blur-sm active:scale-95"
                         title="Click to summarize this document"
                       >

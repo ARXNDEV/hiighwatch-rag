@@ -35,6 +35,23 @@ function DashboardContent() {
     checkAuth();
   }, [router]);
 
+  useEffect(() => {
+    const fetchDocs = async () => {
+      try {
+        const res = await axios.get(`${getApiBaseUrl()}/documents`);
+        if (res.data && Array.isArray(res.data.documents)) {
+          setDocs(res.data.documents);
+        }
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchDocs();
+    }
+  }, [isAuthenticated]);
+
   const handleSyncSuccess = (newDocs: { id: string, name: string, status: string }[]) => {
     setDocs((prev) => {
       // Prevent duplicates by checking doc.id
@@ -44,9 +61,9 @@ function DashboardContent() {
     });
   };
 
-  const handleDocumentClick = (docName: string) => {
+  const handleDocumentClick = (doc: { id: string, name: string }) => {
     // We can dispatch a custom event that ChatInterface will listen to
-    window.dispatchEvent(new CustomEvent('requestDocumentSummary', { detail: { docName } }));
+    window.dispatchEvent(new CustomEvent('requestDocumentSummary', { detail: { docId: doc.id, docName: doc.name } }));
   };
 
   if (isAuthenticated === null) {

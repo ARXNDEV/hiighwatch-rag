@@ -22,8 +22,12 @@ export function DocsPanel({ docs, onDocumentClick }: { docs: { id: string, name:
             className="p-2.5 rounded-lg flex items-center gap-3 group/item hover:bg-white/[0.08] transition-colors cursor-pointer active:scale-[0.98]"
             title="Click to ask AI to summarize this document"
           >
-            <div className="w-7 h-7 rounded-md bg-white/[0.05] flex items-center justify-center text-white/50 group-hover/item:text-white group-hover/item:bg-white/[0.1] transition-colors border border-white/[0.05]">
-              <FileText className="w-3.5 h-3.5" />
+            <div className="w-7 h-7 rounded-md bg-white/[0.05] flex items-center justify-center transition-colors border border-white/[0.05]">
+              {doc.status === "Indexed" ? (
+                <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+              ) : (
+                <FileText className="w-3.5 h-3.5 text-white/50 group-hover/item:text-white" />
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate text-white/70 group-hover/item:text-white transition-colors">{doc.name}</p>

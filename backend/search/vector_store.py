@@ -57,9 +57,12 @@ def search_faiss(query, k=5, filters=None):
     if index.ntotal == 0 or len(chunks) == 0:
         return []
 
-    # Ensure search_k doesn't exceed the total number of vectors in FAISS
-    # If filtering, search the ENTIRE database to guarantee we find the matching document's chunks
-    search_k = index.ntotal if filters else min(k, index.ntotal)
+    if filters and isinstance(filters, dict) and filters.get("doc_id"):
+        search_k = min(index.ntotal, max(k * 100, 1000))
+    elif filters:
+        search_k = min(index.ntotal, max(k * 25, 250))
+    else:
+        search_k = min(k, index.ntotal)
 
     query_embedding = model.encode([query], normalize_embeddings=True).astype('float32')
     distances, indices = index.search(query_embedding, search_k)
@@ -68,18 +71,22 @@ def search_faiss(query, k=5, filters=None):
     for i in indices[0]:
         if i < len(chunks) and i != -1:
             chunk = chunks[i]
-            # Apply metadata filtering
             if filters:
-                doc_id = chunk["doc_id"]
-                metadata = get_document_metadata(doc_id)
-                if metadata:
-                    match = True
-                    for key, val in filters.items():
-                        if metadata.get(key) != val:
-                            match = False
-                            break
-                    if not match:
+                if isinstance(filters, dict) and filters.get("doc_id"):
+                    base_doc_id = chunk["doc_id"].split('_chunk_')[0] if '_chunk_' in chunk["doc_id"] else chunk["doc_id"]
+                    if base_doc_id != filters["doc_id"]:
                         continue
+                else:
+                    doc_id = chunk["doc_id"]
+                    metadata = get_document_metadata(doc_id)
+                    if metadata:
+                        match = True
+                        for key, val in filters.items():
+                            if metadata.get(key) != val:
+                                match = False
+                                break
+                        if not match:
+                            continue
             results.append(chunk)
             if len(results) >= k:
                 break

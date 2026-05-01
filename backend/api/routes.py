@@ -436,18 +436,25 @@ def ask_endpoint(req: AskRequest):
         # Cache key based on query and filters
         cache_key = hashlib.md5(f"{req.query}_{req.filter_metadata}".encode()).hexdigest()
         
+        is_summary_request = req.query.startswith("Please provide a comprehensive summary of the document: ")
+
         # Auto-detect summary requests to apply metadata filtering
         filter_metadata = req.filter_metadata
         faiss_query = req.query
-        if req.query.startswith("Please provide a comprehensive summary of the document: "):
+        if is_summary_request:
             doc_name = req.query.replace("Please provide a comprehensive summary of the document: ", "").strip()
             if not filter_metadata:
-                filter_metadata = {"name": doc_name}
-            # Change the semantic search query so it doesn't get confused by the word "Please provide"
+                doc = files_collection.find_one({"user_email": user_email, "name": doc_name})
+                if doc and doc.get("file_id"):
+                    filter_metadata = {"doc_id": doc["file_id"]}
+                else:
+                    filter_metadata = {"name": doc_name}
+
             faiss_query = f"Overview and summary of {doc_name}"
                 
-        # 1. Search FAISS for top chunks, increasing K significantly because we have smaller 250-word chunks now
-        top_chunks = search_faiss(faiss_query, k=15, filters=filter_metadata)
+        top_k = 15 if is_summary_request else 8
+
+        top_chunks = search_faiss(faiss_query, k=top_k, filters=filter_metadata)
         
         if not top_chunks:
             return AskResponse(
@@ -479,8 +486,7 @@ def ask_endpoint(req: AskRequest):
             cursor = cursor.sort("timestamp", 1)
         except Exception:
             pass
-        # Take the last 10 messages for full conversational context now that we have the 70B model limits
-        chat_history_list = list(cursor)[-10:]
+        chat_history_list = list(cursor)[-6:]
         
         system_prompt = """You are Highwatch, an advanced, highly intelligent conversational AI assistant (similar to ChatGPT) integrated directly into the user's Google Drive. 
 Your primary goal is to help the user understand, analyze, and extract insights from their synced documents.
@@ -518,12 +524,15 @@ Question:
             raise Exception("GROQ_API_KEY is not set in environment variables.")
         client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
+        model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+        max_tokens = 1536 if is_summary_request else 768
+
         try:
             completion = client.chat.completions.create(
-                model="llama-3.3-70b-versatile", # Switched back to the powerful 70B model since we have a new API key
+                model=model,
                 messages=messages,
                 temperature=0.4,
-                max_tokens=2048, # Restored output limits
+                max_tokens=max_tokens,
             )
             answer = completion.choices[0].message.content
         except Exception as e:
